@@ -1,34 +1,38 @@
 :root {
-  --bg: #f1f5f9;
+  --bg: #e7eef5;
+  --bg-pattern: radial-gradient(rgba(2, 132, 199, 0.08) 1.25px, transparent 1.25px);
   --surface: #ffffff;
-  --surface-alt: #f8fafc;
+  --surface-alt: #f4f7fb;
   --text: #0f172a;
   --text-muted: #64748b;
-  --border: #e2e8f0;
+  --border: #dce5f0;
   --primary: #0284c7;
   --primary-hover: #0369a1;
   --primary-soft: #e0f2fe;
   --danger: #dc2626;
+  --success: #16a34a;
   --pinned-bg: #fffbeb;
   --pinned-border: #fde68a;
-  --shadow: 0 2px 10px rgba(15, 23, 42, 0.06);
-  --radius: 14px;
+  --shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
+  --radius: 16px;
 }
 
 [data-theme="dark"] {
-  --bg: #0b1120;
-  --surface: #1e293b;
-  --surface-alt: #0f172a;
+  --bg: #0b141e;
+  --bg-pattern: radial-gradient(rgba(56, 189, 248, 0.08) 1.25px, transparent 1.25px);
+  --surface: #172331;
+  --surface-alt: #101924;
   --text: #f1f5f9;
   --text-muted: #94a3b8;
-  --border: #334155;
+  --border: #263547;
   --primary: #38bdf8;
   --primary-hover: #0ea5e9;
   --primary-soft: rgba(56, 189, 248, 0.14);
   --danger: #f87171;
+  --success: #4ade80;
   --pinned-bg: rgba(245, 158, 11, 0.12);
   --pinned-border: rgba(245, 158, 11, 0.35);
-  --shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+  --shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
 }
 
 * {
@@ -38,10 +42,18 @@
 body {
   margin: 0;
   font-family: 'Rubik', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  background: var(--bg);
+  background-color: var(--bg);
+  background-image: var(--bg-pattern);
+  background-size: 22px 22px;
   color: var(--text);
   line-height: 1.6;
-  transition: background 0.2s ease, color 0.2s ease;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.icon-lg {
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
 }
 
 .icon {
@@ -345,12 +357,114 @@ body {
   font-size: 0.85rem;
 }
 
+/* Auth Gate */
+.auth-gate {
+  margin-top: 24px;
+  display: flex;
+  justify-content: center;
+}
+
+.auth-gate-card {
+  width: 100%;
+  max-width: 430px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 28px 24px;
+  box-shadow: var(--shadow);
+  text-align: center;
+}
+
+.auth-gate-icon {
+  width: 56px;
+  height: 56px;
+  margin: 0 auto 12px;
+  border-radius: 16px;
+  background: var(--primary-soft);
+  color: var(--primary);
+  display: grid;
+  place-items: center;
+}
+
+.auth-gate-card h2 {
+  margin: 0 0 6px;
+  font-size: 1.25rem;
+}
+
+.auth-gate-subtitle {
+  margin: 0 0 18px;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+
+.auth-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  background: var(--surface-alt);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 4px;
+  margin-bottom: 16px;
+}
+
+.auth-tab {
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-family: inherit;
+  font-size: 0.9rem;
+  font-weight: 500;
+  padding: 8px;
+  border-radius: 9px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.auth-tab.active {
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+}
+
+.auth-gate-card .stack-form label {
+  text-align: right;
+}
+
+.success-text {
+  color: var(--success);
+  font-size: 0.86rem;
+  margin: 10px 0 0;
+}
+
+/* Day Dividers & Chat Bubbles */
+.day-divider {
+  display: flex;
+  justify-content: center;
+  margin: 8px 0 2px;
+}
+
+.day-divider span {
+  background: rgba(15, 23, 42, 0.55);
+  color: #ffffff;
+  font-size: 0.78rem;
+  font-weight: 500;
+  padding: 4px 14px;
+  border-radius: 999px;
+  backdrop-filter: blur(4px);
+}
+
+[data-theme="dark"] .day-divider span {
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--text);
+}
+
 /* Feed */
 .feed-container {
   margin-top: 16px;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 12px;
 }
 
 .loading-state,
@@ -364,12 +478,27 @@ body {
 }
 
 .post-card {
+  position: relative;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 16px 18px;
+  border-radius: 16px;
+  border-top-right-radius: 4px;
+  padding: 15px 18px;
+  margin-right: 10px;
   box-shadow: var(--shadow);
   transition: transform 0.15s ease, border-color 0.2s ease;
+}
+
+.post-card::before {
+  content: "";
+  position: absolute;
+  top: -1px;
+  right: -10px;
+  width: 10px;
+  height: 14px;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  clip-path: polygon(100% 0, 0 0, 0 100%);
 }
 
 .post-card.highlight {

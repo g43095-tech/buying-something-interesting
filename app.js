@@ -8,12 +8,14 @@ const state = {
   isAdmin: false,
   posts: [],
   settings: {
-    title: CONFIG.DEFAULT_TITLE || 'הערוץ שלי',
-    description: CONFIG.DEFAULT_DESCRIPTION || 'עדכונים ותוכן נקי',
+    title: CONFIG.DEFAULT_TITLE || 'המקום',
+    description: CONFIG.DEFAULT_DESCRIPTION || 'עדכונים, סרטונים ותוכן נקי ומאושר',
     avatar_url: ''
   },
   activeCategory: 'הכל',
-  searchQuery: ''
+  searchQuery: '',
+  gateMode: 'signin',
+  signedUrlCache: {}
 };
 
 const DEMO_STORAGE_KEY = 'private_channel_demo_v1';
@@ -26,7 +28,22 @@ const el = {
   modeBadge: document.getElementById('modeBadge'),
   themeToggle: document.getElementById('themeToggle'),
   adminSettingsBtn: document.getElementById('adminSettingsBtn'),
+  viewerLogoutBtn: document.getElementById('viewerLogoutBtn'),
   authBtn: document.getElementById('authBtn'),
+  authGate: document.getElementById('authGate'),
+  gateChannelTitle: document.getElementById('gateChannelTitle'),
+  gateDemoNotice: document.getElementById('gateDemoNotice'),
+  gateAuthTabs: document.getElementById('gateAuthTabs'),
+  gateLoginForm: document.getElementById('gateLoginForm'),
+  gateEmail: document.getElementById('gateEmail'),
+  gatePassword: document.getElementById('gatePassword'),
+  gateSubmitBtn: document.getElementById('gateSubmitBtn'),
+  gateOrDivider: document.getElementById('gateOrDivider'),
+  gateGoogleBtn: document.getElementById('gateGoogleBtn'),
+  gateDemoBtn: document.getElementById('gateDemoBtn'),
+  gateError: document.getElementById('gateError'),
+  gateSuccess: document.getElementById('gateSuccess'),
+  channelContent: document.getElementById('channelContent'),
   adminBar: document.getElementById('adminBar'),
   adminEmailDisplay: document.getElementById('adminEmailDisplay'),
   newPostBtn: document.getElementById('newPostBtn'),
@@ -95,12 +112,31 @@ function formatContent(text) {
 function formatDate(iso) {
   try {
     return new Intl.DateTimeFormat('he-IL', {
-      dateStyle: 'short',
-      timeStyle: 'short'
+      hour: '2-digit',
+      minute: '2-digit'
     }).format(new Date(iso));
   } catch {
     return iso;
   }
+}
+
+function getDayKey(iso) {
+  const d = new Date(iso);
+  return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+}
+
+function formatDayLabel(iso) {
+  const d = new Date(iso);
+  const now = new Date();
+  const todayKey = getDayKey(now.toISOString());
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  const yesterdayKey = getDayKey(yesterday.toISOString());
+  const key = getDayKey(iso);
+
+  if (key === todayKey) return 'היום';
+  if (key === yesterdayKey) return 'אתמול';
+  return new Intl.DateTimeFormat('he-IL', { dateStyle: 'long' }).format(d);
 }
 
 function openModal(id) {
@@ -226,24 +262,70 @@ async function handleAuthChange(session) {
   }
 
   renderAuthUI();
-  renderFeed();
+  if (state.user) {
+    await fetchLiveData();
+  } else {
+    state.posts = [];
+    await fetchSettingsOnly();
+  }
+}
+
+async function fetchSettingsOnly() {
+  if (!state.supabase) return;
+  const { data } = await state.supabase
+    .from('channel_settings')
+    .select('*')
+    .eq('id', 1)
+    .maybeSingle();
+  if (data) {
+    state.settings = data;
+    renderHeader();
+  }
+}
+
+async function resolveMediaUrls(posts) {
+  if (!state.supabase) return posts;
+  const paths = posts
+    .map((p) => p.media_url)
+    .filter((u) => u && u.startsWith('storage://'))
+    .map((u) => u.replace('storage://', ''))
+    .filter((path) => !state.signedUrlCache[path]);
+
+  if (paths.length > 0) {
+    const { data } = await state.supabase.storage
+      .from('channel-media')
+      .createSignedUrls(paths, 3600);
+    if (Array.isArray(data)) {
+      data.forEach((item) => {
+        if (item.path && item.signedUrl) {
+          state.signedUrlCache[item.path] = item.signedUrl;
+        }
+      });
+    }
+  }
+
+  return posts.map((p) => {
+    if (p.media_url && p.media_url.startsWith('storage://')) {
+      const path = p.media_url.replace('storage://', '');
+      return { ...p, resolved_media_url: state.signedUrlCache[path] || '' };
+    }
+    return { ...p, resolved_media_url: p.media_url };
+  });
 }
 
 async function fetchLiveData() {
   if (!state.supabase) return;
 
-  const [settingsRes, postsRes] = await Promise.all([
-    state.supabase.from('channel_settings').select('*').eq('id', 1).maybeSingle(),
-    state.supabase.from('posts').select('*').order('created_at', { ascending: false })
-  ]);
+  await fetchSettingsOnly();
+  if (!state.user) return;
 
-  if (settingsRes.data) {
-    state.settings = settingsRes.data;
-    renderHeader();
-  }
+  const postsRes = await state.supabase
+    .from('posts')
+    .select('*')
+    .order('created_at', { ascending: false });
 
   if (postsRes.data) {
-    state.posts = postsRes.data;
+    state.posts = await resolveMediaUrls(postsRes.data);
     renderFeed();
   }
 }
@@ -252,25 +334,45 @@ async function fetchLiveData() {
 function renderHeader() {
   document.title = state.settings.title;
   el.channelTitle.textContent = state.settings.title;
+  if (el.gateChannelTitle) el.gateChannelTitle.textContent = state.settings.title;
   el.channelDescription.textContent = state.settings.description;
 
   if (state.settings.avatar_url) {
     el.channelAvatar.innerHTML = `<img src="${escapeHtml(state.settings.avatar_url)}" alt="${escapeHtml(state.settings.title)}" />`;
   } else {
-    el.channelAvatar.textContent = (state.settings.title || 'ע').trim().charAt(0);
+    el.channelAvatar.textContent = (state.settings.title || 'ה').trim().charAt(0);
   }
 
   el.modeBadge.textContent = state.isDemo ? 'מצב הדגמה' : 'שידור חי';
 }
 
 function renderAuthUI() {
+  const isLoggedIn = Boolean(state.user);
+
+  el.authGate.classList.toggle('hidden', isLoggedIn);
+  el.channelContent.classList.toggle('hidden', !isLoggedIn);
+
+  el.gateDemoNotice.classList.toggle('hidden', !state.isDemo);
+  el.gateDemoBtn.classList.toggle('hidden', !state.isDemo);
+  el.gateAuthTabs.classList.toggle('hidden', state.isDemo);
+  el.gateLoginForm.classList.toggle('hidden', state.isDemo);
+  el.gateOrDivider.classList.toggle('hidden', state.isDemo);
+  el.gateGoogleBtn.classList.toggle('hidden', state.isDemo);
+
   if (state.isAdmin) {
     el.authBtn.classList.add('hidden');
+    el.viewerLogoutBtn.classList.add('hidden');
     el.adminBar.classList.remove('hidden');
     el.adminSettingsBtn.classList.remove('hidden');
     el.adminEmailDisplay.textContent = state.user?.email || 'מנהל הדגמה';
+  } else if (isLoggedIn) {
+    el.authBtn.classList.add('hidden');
+    el.viewerLogoutBtn.classList.remove('hidden');
+    el.adminBar.classList.add('hidden');
+    el.adminSettingsBtn.classList.add('hidden');
   } else {
-    el.authBtn.classList.remove('hidden');
+    el.authBtn.classList.add('hidden');
+    el.viewerLogoutBtn.classList.add('hidden');
     el.adminBar.classList.add('hidden');
     el.adminSettingsBtn.classList.add('hidden');
   }
@@ -318,8 +420,9 @@ function renderPinnedBanner() {
 }
 
 function renderMedia(post) {
-  if (!post.media_url || post.media_type === 'none') return '';
-  const url = escapeHtml(post.media_url);
+  const rawUrl = post.resolved_media_url ?? post.media_url;
+  if (!rawUrl || post.media_type === 'none') return '';
+  const url = escapeHtml(rawUrl);
   const name = escapeHtml(post.media_name || 'קובץ מצורף');
 
   switch (post.media_type) {
@@ -356,9 +459,17 @@ function renderFeed() {
   }
 
   const allowedReactions = CONFIG.ALLOWED_REACTIONS || ['👍', '❤️', '🔥'];
+  let lastDayKey = null;
 
   el.feedContainer.innerHTML = filtered
     .map((post) => {
+      const dayKey = getDayKey(post.created_at);
+      let dayDividerHtml = '';
+      if (dayKey !== lastDayKey) {
+        lastDayKey = dayKey;
+        dayDividerHtml = `<div class="day-divider"><span>${escapeHtml(formatDayLabel(post.created_at))}</span></div>`;
+      }
+
       const reactions = post.reactions || {};
       const reactionsHtml = allowedReactions
         .map((emoji) => {
@@ -376,6 +487,7 @@ function renderFeed() {
         : '';
 
       return `
+        ${dayDividerHtml}
         <article class="post-card" id="post-${post.id}">
           <div class="post-header">
             <div class="post-meta">
@@ -475,8 +587,7 @@ async function savePost(e) {
           .upload(path, file);
         if (uploadErr) throw uploadErr;
 
-        const { data: pub } = state.supabase.storage.from('channel-media').getPublicUrl(path);
-        mediaUrl = pub.publicUrl;
+        mediaUrl = `storage://${path}`;
         if (!mediaName) mediaName = file.name;
       }
     }
@@ -609,7 +720,81 @@ function bindEvents() {
     }
   });
 
-  // Logout
+  // Gate Tabs (signin / signup)
+  el.gateAuthTabs.addEventListener('click', (e) => {
+    const tab = e.target.closest('[data-auth-tab]');
+    if (!tab) return;
+    state.gateMode = tab.dataset.authTab;
+    el.gateAuthTabs.querySelectorAll('.auth-tab').forEach((t) => t.classList.remove('active'));
+    tab.classList.add('active');
+    el.gateSubmitBtn.textContent = state.gateMode === 'signup' ? 'הרשמה לערוץ' : 'התחבר לערוץ';
+    el.gateError.classList.add('hidden');
+    el.gateSuccess.classList.add('hidden');
+  });
+
+  // Gate Login / Signup Form
+  el.gateLoginForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    el.gateError.classList.add('hidden');
+    el.gateSuccess.classList.add('hidden');
+    const email = el.gateEmail.value.trim();
+    const password = el.gatePassword.value;
+
+    if (state.gateMode === 'signup') {
+      const { data, error } = await state.supabase.auth.signUp({ email, password });
+      if (error) {
+        el.gateError.textContent = error.message;
+        el.gateError.classList.remove('hidden');
+      } else if (data.session) {
+        await handleAuthChange(data.session);
+      } else {
+        el.gateSuccess.textContent = 'נשלח אליך מייל אימות! אשר את הכתובת כדי להיכנס לערוץ.';
+        el.gateSuccess.classList.remove('hidden');
+      }
+      return;
+    }
+
+    const { data, error } = await state.supabase.auth.signInWithPassword({ email, password });
+    if (error) {
+      el.gateError.textContent = error.message;
+      el.gateError.classList.remove('hidden');
+    } else {
+      await handleAuthChange(data.session);
+    }
+  });
+
+  // Gate Google OAuth
+  el.gateGoogleBtn.addEventListener('click', async () => {
+    const { error } = await state.supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo: window.location.origin + window.location.pathname }
+    });
+    if (error) {
+      el.gateError.textContent = error.message;
+      el.gateError.classList.remove('hidden');
+    }
+  });
+
+  // Gate Demo Mode
+  el.gateDemoBtn.addEventListener('click', () => {
+    state.user = { email: 'demo@admin.local' };
+    state.isAdmin = true;
+    renderAuthUI();
+    renderFeed();
+  });
+
+  // Viewer Logout
+  el.viewerLogoutBtn.addEventListener('click', async () => {
+    if (state.isDemo) {
+      state.user = null;
+      state.isAdmin = false;
+      renderAuthUI();
+      return;
+    }
+    await state.supabase.auth.signOut();
+  });
+
+  // Logout (Admin)
   el.logoutBtn.addEventListener('click', async () => {
     if (state.isDemo) {
       state.user = null;
@@ -714,9 +899,10 @@ async function init() {
     loadDemoData();
     renderHeader();
     renderAuthUI();
-    renderFeed();
+    if (state.user) renderFeed();
   } else {
     renderHeader();
+    renderAuthUI();
     await initSupabase();
     await fetchLiveData();
   }

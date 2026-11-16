@@ -7,7 +7,7 @@ window.CHANNEL_CONFIG = {
   SUPABASE_ANON_KEY: 'sb_publishable_pqVvNzzJ3tmGLeCqAyQYqQ_7jUfcumU',
 
   // הגדרות ברירת מחדל לפני שטוענים ממסד הנתונים
-  DEFAULT_TITLE: 'הערוץ שלי',
+  DEFAULT_TITLE: 'המקום',
   DEFAULT_DESCRIPTION: 'עדכונים, סרטונים ותוכן נקי ומאושר',
   CATEGORIES: ['כללי', 'עדכונים', 'סרטונים', 'מאמרים', 'קבצים'],
   ALLOWED_REACTIONS: ['👍', '❤️', '🔥', '👏', '😮']
