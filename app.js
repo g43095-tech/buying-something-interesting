@@ -42,7 +42,7 @@ const SCROLL_STORAGE_KEY = 'hamakom_scroll_anchor_v2';
 const BG_STORAGE_KEY = 'hamakom_bg_choice';
 const REACTED_STORAGE_KEY = 'hamakom_reacted_v1';
 const NOTIFY_STORAGE_KEY = 'hamakom_browser_notify';
-const FEED_CACHE_KEY = 'hamakom_feed_cache_v1';
+const FEED_CACHE_KEY = 'hamakom_feed_cache_v2';
 const PAGE_SIZE = 25;
 let hasMoreOlder = false;
 let hasRestoredInitialScroll = false;
@@ -613,10 +613,12 @@ function saveFeedCache() {
 }
 
 function clearFeedCache() {
+  localStorage.removeItem('hamakom_feed_cache_v1');
   localStorage.removeItem(FEED_CACHE_KEY);
 }
 
 function hydrateInstantFromCache() {
+  localStorage.removeItem('hamakom_feed_cache_v1');
   const storedSession = getStoredSupabaseSession();
   if (!storedSession) return false;
 
@@ -631,10 +633,17 @@ function hydrateInstantFromCache() {
     if (Array.isArray(raw.posts)) state.posts = raw.posts;
     hasMoreOlder = Boolean(raw.hasMoreOlder);
 
-    // Reuse signed URLs only if cached within last 40 minutes
-    if (raw.signedUrlCache && Date.now() - (raw.cachedAt || 0) < 40 * 60 * 1000) {
-      state.signedUrlCache = raw.signedUrlCache;
+    // שומר רק כתובות חתומות שבאמת טרם פג תוקפן
+    const now = Date.now();
+    const validCache = {};
+    if (raw.signedUrlCache && typeof raw.signedUrlCache === 'object') {
+      Object.entries(raw.signedUrlCache).forEach(([path, entry]) => {
+        if (entry && typeof entry === 'object' && entry.url && entry.expiresAt > now + 60 * 1000) {
+          validCache[path] = entry;
+        }
+      });
     }
+    state.signedUrlCache = validCache;
 
     state.posts = attachCachedSignedUrls(state.posts);
     renderHeader();
@@ -790,43 +799,82 @@ async function logAnalyticsEvent(eventType, details = {}) {
   await state.supabase.from('analytics_events').insert(row);
 }
 
+function getCachedSignedUrl(path) {
+  const entry = state.signedUrlCache[path];
+  if (!entry) return '';
+  if (typeof entry === 'string') return '';
+  if (entry.expiresAt && entry.expiresAt > Date.now() + 30 * 1000) {
+    return entry.url;
+  }
+  return '';
+}
+
 function attachCachedSignedUrls(posts) {
   return posts.map((p) => {
     if (p.media_url && p.media_url.startsWith('storage://')) {
       const path = p.media_url.replace('storage://', '');
-      return { ...p, resolved_media_url: state.signedUrlCache[path] || '' };
+      return { ...p, resolved_media_url: getCachedSignedUrl(path) };
     }
     return { ...p, resolved_media_url: p.media_url };
   });
 }
 
-async function resolveMediaUrlsInBackground(posts) {
+async function resolveMediaUrlsInBackground(posts, force = false) {
   if (!state.supabase) return;
-  const paths = posts
-    .map((p) => p.media_url)
-    .filter((u) => u && u.startsWith('storage://'))
-    .map((u) => u.replace('storage://', ''))
-    .filter((path) => !state.signedUrlCache[path]);
+  const refreshThreshold = Date.now() + 15 * 60 * 1000;
+  const uniquePaths = [
+    ...new Set(
+      posts
+        .map((p) => p.media_url)
+        .filter((u) => u && u.startsWith('storage://'))
+        .map((u) => u.replace('storage://', ''))
+    )
+  ];
+
+  const paths = uniquePaths.filter((path) => {
+    if (force) return true;
+    const entry = state.signedUrlCache[path];
+    return !entry || typeof entry !== 'object' || !entry.url || entry.expiresAt <= refreshThreshold;
+  });
 
   if (paths.length === 0) return;
 
-  const { data } = await state.supabase.storage
+  const expiresAt = Date.now() + 50 * 60 * 1000;
+  let changed = false;
+
+  const { data, error } = await state.supabase.storage
     .from('channel-media')
     .createSignedUrls(paths, 3600);
 
-  if (Array.isArray(data)) {
-    let changed = false;
+  if (!error && Array.isArray(data)) {
     data.forEach((item) => {
       if (item.path && item.signedUrl) {
-        state.signedUrlCache[item.path] = item.signedUrl;
+        state.signedUrlCache[item.path] = { url: item.signedUrl, expiresAt };
         changed = true;
       }
     });
-    if (changed) {
-      state.posts = attachCachedSignedUrls(state.posts);
-      saveFeedCache();
-      renderFeed();
-    }
+  }
+
+  // גיבוי פרטני במקרה שאצווה חלקית כשלה
+  const missingPaths = paths.filter((p) => !getCachedSignedUrl(p));
+  if (missingPaths.length > 0) {
+    await Promise.all(
+      missingPaths.map(async (p) => {
+        const res = await state.supabase.storage
+          .from('channel-media')
+          .createSignedUrl(p, 3600);
+        if (res.data?.signedUrl) {
+          state.signedUrlCache[p] = { url: res.data.signedUrl, expiresAt };
+          changed = true;
+        }
+      })
+    );
+  }
+
+  if (changed) {
+    state.posts = attachCachedSignedUrls(state.posts);
+    saveFeedCache();
+    renderFeed();
   }
 }
 
@@ -1557,9 +1605,7 @@ function uploadFileWithProgress(file, path) {
     xhr.setRequestHeader('apikey', CONFIG.SUPABASE_ANON_KEY);
     xhr.setRequestHeader('Authorization', `Bearer ${token}`);
     xhr.setRequestHeader('x-upsert', 'false');
-    if (file.type) {
-      xhr.setRequestHeader('Content-Type', file.type);
-    }
+    xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
 
     xhr.upload.onprogress = (evt) => {
       if (!evt.lengthComputable) return;
@@ -2530,6 +2576,24 @@ function bindEvents() {
     el.analyticsTabLinks.classList.toggle('hidden', state.analyticsTab !== 'links');
     el.analyticsTabMailing.classList.toggle('hidden', state.analyticsTab !== 'mailing');
   });
+
+  // Auto-recover media if a signed URL expired while tab was left open
+  let mediaRecoveryCooldown = 0;
+  el.feedContainer.addEventListener(
+    'error',
+    (e) => {
+      const target = e.target;
+      if (
+        target &&
+        (target.tagName === 'VIDEO' || target.tagName === 'IMG' || target.tagName === 'AUDIO') &&
+        Date.now() - mediaRecoveryCooldown > 15000
+      ) {
+        mediaRecoveryCooldown = Date.now();
+        resolveMediaUrlsInBackground(state.posts, true);
+      }
+    },
+    true
+  );
 
   // Keyboard shortcuts (Esc to close modals/lightbox, / to search)
   document.addEventListener('keydown', (e) => {
