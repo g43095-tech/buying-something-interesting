@@ -42,6 +42,9 @@ const SCROLL_STORAGE_KEY = 'hamakom_scroll_anchor_v2';
 const BG_STORAGE_KEY = 'hamakom_bg_choice';
 const REACTED_STORAGE_KEY = 'hamakom_reacted_v1';
 const NOTIFY_STORAGE_KEY = 'hamakom_browser_notify';
+const FEED_CACHE_KEY = 'hamakom_feed_cache_v1';
+const PAGE_SIZE = 25;
+let hasMoreOlder = false;
 let hasRestoredInitialScroll = false;
 let viewObserver = null;
 
@@ -103,6 +106,8 @@ const el = {
   categoryChips: document.getElementById('categoryChips'),
   pinnedBanner: document.getElementById('pinnedBanner'),
   pinnedText: document.getElementById('pinnedText'),
+  loadOlderWrap: document.getElementById('loadOlderWrap'),
+  loadOlderBtn: document.getElementById('loadOlderBtn'),
   feedContainer: document.getElementById('feedContainer'),
 
   postModal: document.getElementById('postModal'),
@@ -567,11 +572,87 @@ function saveDemoData() {
   );
 }
 
+// --- Instant Cache Hydration (< 50ms first paint for returning users) ---
+function getStoredSupabaseSession() {
+  try {
+    const key = Object.keys(localStorage).find(
+      (k) => k.startsWith('sb-') && k.endsWith('-auth-token')
+    );
+    if (!key) return null;
+    const raw = JSON.parse(localStorage.getItem(key) || 'null');
+    if (raw?.user?.email) return raw;
+  } catch {
+    // ignore
+  }
+  return null;
+}
+
+function saveFeedCache() {
+  if (!state.user || state.isDemo) return;
+  try {
+    localStorage.setItem(
+      FEED_CACHE_KEY,
+      JSON.stringify({
+        userEmail: state.user.email,
+        isAdmin: state.isAdmin,
+        settings: state.settings,
+        posts: state.posts.slice(-PAGE_SIZE),
+        hasMoreOlder,
+        signedUrlCache: state.signedUrlCache,
+        cachedAt: Date.now()
+      })
+    );
+  } catch {
+    // ignore storage quota
+  }
+}
+
+function clearFeedCache() {
+  localStorage.removeItem(FEED_CACHE_KEY);
+}
+
+function hydrateInstantFromCache() {
+  const storedSession = getStoredSupabaseSession();
+  if (!storedSession) return false;
+
+  try {
+    const raw = JSON.parse(localStorage.getItem(FEED_CACHE_KEY) || 'null');
+    if (!raw || raw.userEmail !== storedSession.user.email) return false;
+
+    state.session = storedSession;
+    state.user = storedSession.user;
+    state.isAdmin = Boolean(raw.isAdmin);
+    if (raw.settings) state.settings = raw.settings;
+    if (Array.isArray(raw.posts)) state.posts = raw.posts;
+    hasMoreOlder = Boolean(raw.hasMoreOlder);
+
+    // Reuse signed URLs only if cached within last 40 minutes
+    if (raw.signedUrlCache && Date.now() - (raw.cachedAt || 0) < 40 * 60 * 1000) {
+      state.signedUrlCache = raw.signedUrlCache;
+    }
+
+    state.posts = attachCachedSignedUrls(state.posts);
+    renderHeader();
+    renderAuthUI();
+    renderCategories();
+    el.loadOlderWrap?.classList.toggle('hidden', !hasMoreOlder);
+    renderFeed({ restoreScroll: true });
+    el.bootLoader.classList.add('hidden');
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 // --- Supabase Init ---
 async function initSupabase() {
-  const { createClient } = await import(
-    'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm'
-  );
+  let createClient = window.supabase?.createClient;
+  if (!createClient) {
+    const mod = await import(
+      'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm'
+    );
+    createClient = mod.createClient;
+  }
   state.supabase = createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
 
   const { data: sessionData } = await state.supabase.auth.getSession();
@@ -704,40 +785,90 @@ async function logAnalyticsEvent(eventType, details = {}) {
   await state.supabase.from('analytics_events').insert(row);
 }
 
+function attachCachedSignedUrls(posts) {
+  return posts.map((p) => {
+    if (p.media_url && p.media_url.startsWith('storage://')) {
+      const path = p.media_url.replace('storage://', '');
+      return { ...p, resolved_media_url: state.signedUrlCache[path] || '' };
+    }
+    return { ...p, resolved_media_url: p.media_url };
+  });
+}
+
+async function resolveMediaUrlsInBackground(posts) {
+  if (!state.supabase) return;
+  const paths = posts
+    .map((p) => p.media_url)
+    .filter((u) => u && u.startsWith('storage://'))
+    .map((u) => u.replace('storage://', ''))
+    .filter((path) => !state.signedUrlCache[path]);
+
+  if (paths.length === 0) return;
+
+  const { data } = await state.supabase.storage
+    .from('channel-media')
+    .createSignedUrls(paths, 3600);
+
+  if (Array.isArray(data)) {
+    let changed = false;
+    data.forEach((item) => {
+      if (item.path && item.signedUrl) {
+        state.signedUrlCache[item.path] = item.signedUrl;
+        changed = true;
+      }
+    });
+    if (changed) {
+      state.posts = attachCachedSignedUrls(state.posts);
+      saveFeedCache();
+      renderFeed();
+    }
+  }
+}
+
 async function handleAuthChange(session) {
   state.session = session || null;
   state.user = session?.user || null;
-  state.isAdmin = false;
 
-  if (state.user && state.supabase) {
-    const { data } = await state.supabase
-      .from('admins')
-      .select('email')
-      .eq('email', state.user.email)
-      .maybeSingle();
-    state.isAdmin = Boolean(data);
-    await syncPendingMailingConsent(state.user);
-  }
-
-  if (state.user) {
-    if (!state.loggedPageView) {
-      state.loggedPageView = true;
-      logAnalyticsEvent('page_view', { target_label: 'כניסה לערוץ' });
-    }
-    await fetchLiveData();
-    if (state.isAdmin) await fetchFeedbacks();
-  } else {
+  if (!state.user) {
+    state.isAdmin = false;
     state.posts = [];
     state.feedbacks = [];
     state.loggedPageView = false;
     state.seenPostsThisSession.clear();
     state.seenAdThisSession = false;
     hasRestoredInitialScroll = false;
+    hasMoreOlder = false;
+    clearFeedCache();
+    renderAuthUI();
+    el.bootLoader.classList.add('hidden');
     await fetchSettingsOnly();
+    return;
   }
 
+  // מציגים את הממשק מיד בלי לחסום על בדיקת מנהל/נתונים
   renderAuthUI();
   el.bootLoader.classList.add('hidden');
+
+  if (!state.loggedPageView) {
+    state.loggedPageView = true;
+    logAnalyticsEvent('page_view', { target_label: 'כניסה לערוץ' });
+  }
+
+  // מריצים במקביל את בדיקת ההרשאה, סנכרון דיוור וטעינת הפיד
+  const [adminRes] = await Promise.all([
+    state.supabase
+      .from('admins')
+      .select('email')
+      .eq('email', state.user.email)
+      .maybeSingle(),
+    syncPendingMailingConsent(state.user),
+    fetchLiveData()
+  ]);
+
+  state.isAdmin = Boolean(adminRes?.data);
+  renderAuthUI();
+  saveFeedCache();
+  if (state.isAdmin) fetchFeedbacks();
 }
 
 async function fetchSettingsOnly() {
@@ -753,54 +884,87 @@ async function fetchSettingsOnly() {
   }
 }
 
-async function resolveMediaUrls(posts) {
-  if (!state.supabase) return posts;
-  const paths = posts
-    .map((p) => p.media_url)
-    .filter((u) => u && u.startsWith('storage://'))
-    .map((u) => u.replace('storage://', ''))
-    .filter((path) => !state.signedUrlCache[path]);
+async function fetchLiveData(opts = {}) {
+  if (!state.supabase || !state.user) return;
 
-  if (paths.length > 0) {
-    const { data } = await state.supabase.storage
-      .from('channel-media')
-      .createSignedUrls(paths, 3600);
-    if (Array.isArray(data)) {
-      data.forEach((item) => {
-        if (item.path && item.signedUrl) {
-          state.signedUrlCache[item.path] = item.signedUrl;
-        }
-      });
-    }
+  const [settingsRes, postsRes] = await Promise.all([
+    state.supabase.from('channel_settings').select('*').eq('id', 1).maybeSingle(),
+    state.supabase
+      .from('posts')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(PAGE_SIZE)
+  ]);
+
+  if (settingsRes.data) {
+    state.settings = settingsRes.data;
+    renderHeader();
   }
 
-  return posts.map((p) => {
-    if (p.media_url && p.media_url.startsWith('storage://')) {
-      const path = p.media_url.replace('storage://', '');
-      return { ...p, resolved_media_url: state.signedUrlCache[path] || '' };
+  if (postsRes.data) {
+    hasMoreOlder = postsRes.data.length === PAGE_SIZE;
+    el.loadOlderWrap?.classList.toggle('hidden', !hasMoreOlder);
+
+    const chronological = [...postsRes.data].reverse();
+    const nextPosts = attachCachedSignedUrls(chronological);
+    const sig = (arr) =>
+      JSON.stringify(
+        arr.map((p) => [p.id, p.updated_at, p.is_pinned, p.reactions, p.resolved_media_url])
+      );
+    const changed = sig(state.posts) !== sig(nextPosts);
+    state.posts = nextPosts;
+
+    if (changed || !hasRestoredInitialScroll) {
+      renderCategories();
+      renderStats();
+      renderFeed({
+        restoreScroll: !opts.skipInitialRestore && !hasRestoredInitialScroll
+      });
     }
-    return { ...p, resolved_media_url: p.media_url };
-  });
+    saveFeedCache();
+
+    // טעינת כתובות המדיה החתומות מתבצעת ברקע בלי לעכב את הצגת הפיד!
+    resolveMediaUrlsInBackground(state.posts);
+  }
 }
 
-async function fetchLiveData(opts = {}) {
-  if (!state.supabase) return;
+async function loadOlderPosts() {
+  if (!state.supabase || !state.user || state.posts.length === 0) return;
+  const oldest = state.posts[0];
+  if (el.loadOlderBtn) {
+    el.loadOlderBtn.disabled = true;
+    el.loadOlderBtn.textContent = 'טוען...';
+  }
 
-  await fetchSettingsOnly();
-  if (!state.user) return;
+  const prevHeight = document.documentElement.scrollHeight;
+  const prevScrollY = window.scrollY;
 
-  const postsRes = await state.supabase
+  const { data } = await state.supabase
     .from('posts')
     .select('*')
-    .order('created_at', { ascending: true });
+    .lt('created_at', oldest.created_at)
+    .order('created_at', { ascending: false })
+    .limit(PAGE_SIZE);
 
-  if (postsRes.data) {
-    state.posts = await resolveMediaUrls(postsRes.data);
+  if (data && data.length > 0) {
+    hasMoreOlder = data.length === PAGE_SIZE;
+    const olderChrono = attachCachedSignedUrls([...data].reverse());
+    state.posts = [...olderChrono, ...state.posts];
     renderCategories();
     renderStats();
-    renderFeed({
-      restoreScroll: !opts.skipInitialRestore && !hasRestoredInitialScroll
-    });
+    renderFeed();
+
+    const addedHeight = document.documentElement.scrollHeight - prevHeight;
+    window.scrollTo({ top: prevScrollY + addedHeight, behavior: 'instant' });
+    resolveMediaUrlsInBackground(olderChrono);
+  } else {
+    hasMoreOlder = false;
+  }
+
+  el.loadOlderWrap?.classList.toggle('hidden', !hasMoreOlder);
+  if (el.loadOlderBtn) {
+    el.loadOlderBtn.disabled = false;
+    el.loadOlderBtn.textContent = 'טען הודעות ישנות יותר';
   }
 }
 
@@ -2019,9 +2183,13 @@ function bindEvents() {
     }
   });
 
+  // Load older posts
+  el.loadOlderBtn?.addEventListener('click', loadOlderPosts);
+
   // Logout
   el.logoutBtn.addEventListener('click', async () => {
     hasRestoredInitialScroll = false;
+    clearFeedCache();
     if (state.isDemo) {
       state.user = null;
       state.isAdmin = false;
@@ -2343,6 +2511,7 @@ async function init() {
     if (state.user) renderFeed({ restoreScroll: true });
   } else {
     renderHeader();
+    hydrateInstantFromCache();
     await initSupabase();
   }
 }

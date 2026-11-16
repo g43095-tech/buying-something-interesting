@@ -5,9 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>המקום</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%230284c7' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M4.9 19.1C1 15.2 1 8.8 4.9 4.9'/><path d='M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.5'/><circle cx='12' cy='12' r='2'/><path d='M16.2 7.8c2.3 2.3 2.3 6.1 0 8.5'/><path d='M19.1 4.9C23 8.8 23 15.1 19.1 19'/></svg>" />
+  <link rel="preconnect" href="https://sqqghfcdgswvwvbiulwk.supabase.co" crossorigin />
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;600;700&family=Frank+Ruhl+Libre:wght@400;700&family=Heebo:wght@400;600;700&family=Rubik:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;600;700&family=Frank+Ruhl+Libre:wght@400;700&family=Heebo:wght@400;600;700&family=Rubik:wght@400;500;600;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'" />
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body data-bg="dots">
@@ -146,6 +148,11 @@
         <div class="pinned-text" id="pinnedText"></div>
         <span class="pinned-jump">עבור</span>
       </section>
+
+      <!-- כפתור טעינת הודעות ישנות יותר -->
+      <div id="loadOlderWrap" class="load-older-wrap hidden">
+        <button type="button" id="loadOlderBtn" class="btn btn-outline">טען הודעות ישנות יותר</button>
+      </div>
 
       <!-- פיד הפוסטים -->
       <main class="feed-container" id="feedContainer">
@@ -515,7 +522,8 @@
     <video id="lightboxVideo" class="hidden" src="" controls autoplay playsinline></video>
   </div>
 
-  <script src="config.js"></script>
+  <script src="config.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js" defer></script>
   <script type="module" src="app.js"></script>
 </body>
 </html>

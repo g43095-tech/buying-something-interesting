@@ -1841,6 +1841,12 @@ body[data-bg="clean"] .bg-ambient {
   margin: 0;
 }
 
+.load-older-wrap {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 12px;
+}
+
 /* Signup Consents & Privacy */
 .signup-consents {
   display: flex;
