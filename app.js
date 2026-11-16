@@ -80,8 +80,11 @@ const el = {
   gateError: document.getElementById('gateError'),
   gateSuccess: document.getElementById('gateSuccess'),
   channelContent: document.getElementById('channelContent'),
-  adminBar: document.getElementById('adminBar'),
-  adminEmailDisplay: document.getElementById('adminEmailDisplay'),
+  profileTrigger: document.getElementById('profileTrigger'),
+  adminRoleBadge: document.getElementById('adminRoleBadge'),
+  adminMenuToggleBtn: document.getElementById('adminMenuToggleBtn'),
+  adminMenuUnreadDot: document.getElementById('adminMenuUnreadDot'),
+  adminDrawer: document.getElementById('adminDrawer'),
   openAnalyticsBtn: document.getElementById('openAnalyticsBtn'),
   openInboxBtn: document.getElementById('openInboxBtn'),
   inboxUnreadCount: document.getElementById('inboxUnreadCount'),
@@ -100,7 +103,6 @@ const el = {
   categoryChips: document.getElementById('categoryChips'),
   pinnedBanner: document.getElementById('pinnedBanner'),
   pinnedText: document.getElementById('pinnedText'),
-  jumpToPinnedBtn: document.getElementById('jumpToPinnedBtn'),
   feedContainer: document.getElementById('feedContainer'),
 
   postModal: document.getElementById('postModal'),
@@ -109,7 +111,12 @@ const el = {
   editPostId: document.getElementById('editPostId'),
   postCategory: document.getElementById('postCategory'),
   postPinned: document.getElementById('postPinned'),
-  postContent: document.getElementById('postContent'),
+  rteToolbar: document.getElementById('rteToolbar'),
+  rteFontFamily: document.getElementById('rteFontFamily'),
+  rteFontSize: document.getElementById('rteFontSize'),
+  rteForeColor: document.getElementById('rteForeColor'),
+  rteBackColor: document.getElementById('rteBackColor'),
+  postEditor: document.getElementById('postEditor'),
   postMediaType: document.getElementById('postMediaType'),
   mediaDropzone: document.getElementById('mediaDropzone'),
   dropzoneText: document.getElementById('dropzoneText'),
@@ -164,7 +171,105 @@ function escapeHtml(str) {
     .replace(/'/g, '&#39;');
 }
 
+const ALLOWED_RICH_TAGS = new Set([
+  'B', 'STRONG', 'I', 'EM', 'U', 'S', 'STRIKE', 'SPAN', 'P', 'DIV', 'BR',
+  'UL', 'OL', 'LI', 'FONT', 'A', 'H1', 'H2', 'H3', 'BLOCKQUOTE'
+]);
+
+const ALLOWED_FONT_FAMILIES = new Set([
+  'Rubik', 'Assistant', 'Heebo', 'Frank Ruhl Libre', 'Courier New'
+]);
+
+function stripHtml(text) {
+  if (!text) return '';
+  if (!/<[a-z][\s\S]*>/i.test(text)) return text;
+  const doc = new DOMParser().parseFromString(text, 'text/html');
+  return (doc.body.textContent || '').replace(/\s+/g, ' ').trim();
+}
+
+function sanitizeRichHtml(rawHtml) {
+  const doc = new DOMParser().parseFromString(rawHtml || '', 'text/html');
+
+  function cleanNode(node) {
+    if (node.nodeType === Node.TEXT_NODE) {
+      const span = document.createElement('span');
+      const escaped = escapeHtml(node.textContent || '');
+      if (/https?:\/\/[^\s<]+/.test(node.textContent || '')) {
+        span.innerHTML = escaped.replace(
+          /(https?:\/\/[^\s<]+)/g,
+          (url) => `<a href="${url}" target="_blank" rel="noopener noreferrer">${url}</a>`
+        );
+        return span;
+      }
+      return document.createTextNode(node.textContent || '');
+    }
+
+    if (node.nodeType !== Node.ELEMENT_NODE) {
+      return document.createTextNode('');
+    }
+
+    const tag = node.tagName.toUpperCase();
+    if (tag === 'SCRIPT' || tag === 'STYLE' || tag === 'IFRAME' || tag === 'OBJECT' || tag === 'SVG') {
+      return document.createTextNode('');
+    }
+
+    if (!ALLOWED_RICH_TAGS.has(tag)) {
+      const frag = document.createDocumentFragment();
+      Array.from(node.childNodes).forEach((child) => frag.appendChild(cleanNode(child)));
+      return frag;
+    }
+
+    const elClean = document.createElement(tag.toLowerCase());
+
+    if (tag === 'A') {
+      const href = node.getAttribute('href') || '';
+      if (/^https?:\/\//i.test(href)) {
+        elClean.setAttribute('href', href);
+        elClean.setAttribute('target', '_blank');
+        elClean.setAttribute('rel', 'noopener noreferrer');
+      }
+    }
+
+    if (tag === 'FONT') {
+      const color = node.getAttribute('color');
+      const face = node.getAttribute('face');
+      const size = node.getAttribute('size');
+      if (color && /^#[0-9a-f]{3,8}$|^rgb\(/i.test(color)) elClean.setAttribute('color', color);
+      if (face && ALLOWED_FONT_FAMILIES.has(face.replace(/['"]/g, '').trim())) {
+        elClean.setAttribute('face', face.replace(/['"]/g, '').trim());
+      }
+      if (size && /^[1-7]$/.test(size)) elClean.setAttribute('size', size);
+    }
+
+    if (node.style) {
+      if (node.style.color) elClean.style.color = node.style.color;
+      if (node.style.backgroundColor) elClean.style.backgroundColor = node.style.backgroundColor;
+      if (node.style.fontFamily) {
+        const cleanFont = node.style.fontFamily.replace(/['"]/g, '').split(',')[0].trim();
+        if (ALLOWED_FONT_FAMILIES.has(cleanFont)) elClean.style.fontFamily = cleanFont;
+      }
+      if (node.style.fontSize) elClean.style.fontSize = node.style.fontSize;
+      if (['right', 'center', 'left', 'start', 'end'].includes(node.style.textAlign)) {
+        elClean.style.textAlign = node.style.textAlign;
+      }
+    }
+
+    Array.from(node.childNodes).forEach((child) => {
+      elClean.appendChild(cleanNode(child));
+    });
+    return elClean;
+  }
+
+  const out = document.createElement('div');
+  Array.from(doc.body.childNodes).forEach((child) => out.appendChild(cleanNode(child)));
+  return out.innerHTML;
+}
+
 function formatContent(text) {
+  if (!text) return '';
+  if (/<[a-z][\s\S]*>/i.test(text)) {
+    return sanitizeRichHtml(text);
+  }
   const safe = escapeHtml(text);
   return safe.replace(
     /(https?:\/\/[^\s<]+)/g,
@@ -763,13 +868,12 @@ function renderAuthUI() {
     el.profileEmail.textContent = state.user?.email || '—';
   }
 
-  if (state.isAdmin) {
-    el.adminBar.classList.remove('hidden');
-    el.adminSettingsBtn.classList.remove('hidden');
-    el.adminEmailDisplay.textContent = state.user?.email || 'מנהל הדגמה';
-  } else {
-    el.adminBar.classList.add('hidden');
-    el.adminSettingsBtn.classList.add('hidden');
+  el.adminRoleBadge?.classList.toggle('hidden', !state.isAdmin);
+  el.adminMenuToggleBtn?.classList.toggle('hidden', !state.isAdmin);
+  el.profileTrigger?.classList.toggle('is-clickable', state.isAdmin);
+
+  if (!state.isAdmin) {
+    el.adminDrawer?.classList.add('hidden');
   }
 }
 
@@ -812,13 +916,20 @@ function renderPinnedBanner() {
   }
 
   el.pinnedBanner.classList.remove('hidden');
-  el.pinnedText.textContent = pinned.content || pinned.media_name || 'הודעה נעוצה';
-  el.jumpToPinnedBtn.onclick = () => {
+  el.pinnedText.textContent = stripHtml(pinned.content) || pinned.media_name || 'הודעה נעוצה';
+  const jumpToPinned = () => {
     const card = document.getElementById(`post-${pinned.id}`);
     if (card) {
       card.scrollIntoView({ behavior: 'smooth', block: 'center' });
       card.classList.add('highlight');
       setTimeout(() => card.classList.remove('highlight'), 1800);
+    }
+  };
+  el.pinnedBanner.onclick = jumpToPinned;
+  el.pinnedBanner.onkeydown = (e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      jumpToPinned();
     }
   };
 }
@@ -947,7 +1058,7 @@ function renderFeed(options = {}) {
     const matchCat = state.activeCategory === 'הכל' || post.category === state.activeCategory;
     const matchSearch =
       !q ||
-      (post.content || '').toLowerCase().includes(q) ||
+      stripHtml(post.content).toLowerCase().includes(q) ||
       (post.media_name || '').toLowerCase().includes(q) ||
       (post.category || '').toLowerCase().includes(q);
     return matchCat && matchSearch;
@@ -1164,7 +1275,7 @@ function openPostModal(post = null) {
     el.editPostId.value = post.id;
     el.postCategory.value = post.category || 'כללי';
     el.postPinned.checked = Boolean(post.is_pinned);
-    el.postContent.value = post.content || '';
+    el.postEditor.innerHTML = formatContent(post.content || '');
     el.postMediaType.value = post.media_type || 'none';
     el.postMediaUrl.value = post.media_url || '';
     el.postMediaName.value = post.media_name || '';
@@ -1173,7 +1284,7 @@ function openPostModal(post = null) {
     el.editPostId.value = '';
     el.postCategory.value = (CONFIG.CATEGORIES && CONFIG.CATEGORIES[0]) || 'כללי';
     el.postPinned.checked = false;
-    el.postContent.value = '';
+    el.postEditor.innerHTML = '';
     el.postMediaType.value = 'none';
     el.postMediaUrl.value = '';
     el.postMediaName.value = '';
@@ -1182,6 +1293,7 @@ function openPostModal(post = null) {
   const showMediaFields = el.postMediaType.value !== 'none';
   el.mediaInputs.classList.toggle('hidden', !showMediaFields);
   openModal('postModal');
+  setTimeout(() => el.postEditor.focus(), 60);
 }
 
 function uploadFileWithProgress(file, path) {
@@ -1298,11 +1410,13 @@ async function savePost(e) {
   const rawUrl = el.postMediaUrl.value.trim();
   const rawName = el.postMediaName.value.trim();
   const file = el.postMediaFile.files[0];
-  const content = el.postContent.value.trim();
+  const rawHtml = sanitizeRichHtml(el.postEditor.innerHTML).trim();
+  const plainText = stripHtml(rawHtml);
+  const content = plainText ? rawHtml : '';
   const category = el.postCategory.value;
   const isPinned = el.postPinned.checked;
 
-  if (!content && !rawUrl && !(mediaType !== 'none' && file)) {
+  if (!plainText && !rawUrl && !(mediaType !== 'none' && file)) {
     el.postFormError.textContent = 'יש להזין טקסט או לצרף מדיה.';
     el.postFormError.classList.remove('hidden');
     return;
@@ -1412,10 +1526,14 @@ function saveDemoFeedbacks() {
 }
 
 function updateInboxBadge() {
-  if (!el.inboxUnreadCount) return;
   const unread = state.feedbacks.filter((f) => !f.is_read).length;
-  el.inboxUnreadCount.textContent = String(unread);
-  el.inboxUnreadCount.classList.toggle('hidden', unread === 0);
+  if (el.inboxUnreadCount) {
+    el.inboxUnreadCount.textContent = String(unread);
+    el.inboxUnreadCount.classList.toggle('hidden', unread === 0);
+  }
+  if (el.adminMenuUnreadDot) {
+    el.adminMenuUnreadDot.classList.toggle('hidden', unread === 0);
+  }
 }
 
 async function fetchFeedbacks() {
@@ -1912,6 +2030,48 @@ function bindEvents() {
     }
     await state.supabase.auth.signOut();
     showToast('התנתקת מהערוץ');
+  });
+
+  // Admin Drawer Toggle (via clicking profile or settings/manage gear button)
+  const toggleAdminDrawer = () => {
+    if (!state.isAdmin) return;
+    const isHidden = el.adminDrawer.classList.toggle('hidden');
+    el.adminMenuToggleBtn?.classList.toggle('is-active', !isHidden);
+  };
+
+  el.adminMenuToggleBtn?.addEventListener('click', toggleAdminDrawer);
+  el.profileTrigger?.addEventListener('click', toggleAdminDrawer);
+
+  // Rich Text Editor Toolbar
+  el.rteToolbar?.addEventListener('mousedown', (e) => {
+    if (e.target.closest('button')) e.preventDefault();
+  });
+
+  el.rteToolbar?.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-cmd]');
+    if (!btn) return;
+    el.postEditor.focus();
+    document.execCommand(btn.dataset.cmd, false, null);
+  });
+
+  el.rteFontFamily?.addEventListener('change', () => {
+    el.postEditor.focus();
+    document.execCommand('fontName', false, el.rteFontFamily.value);
+  });
+
+  el.rteFontSize?.addEventListener('change', () => {
+    el.postEditor.focus();
+    document.execCommand('fontSize', false, el.rteFontSize.value);
+  });
+
+  el.rteForeColor?.addEventListener('input', () => {
+    el.postEditor.focus();
+    document.execCommand('foreColor', false, el.rteForeColor.value);
+  });
+
+  el.rteBackColor?.addEventListener('input', () => {
+    el.postEditor.focus();
+    document.execCommand('hiliteColor', false, el.rteBackColor.value);
   });
 
   // New / Edit Post & Drag-and-Drop Media
