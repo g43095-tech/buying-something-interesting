@@ -55,6 +55,23 @@
             </button>
           </div>
         </label>
+
+        <!-- אישורים בהרשמה בלבד (מאושרים כברירת מחדל, ניתנים להסרה) -->
+        <div id="gateSignupExtras" class="signup-consents hidden">
+          <label class="consent-row">
+            <input type="checkbox" id="agreeTermsCheckbox" checked />
+            <span>
+              אני מאשר/ת את
+              <button type="button" id="openPrivacyModalBtn" class="inline-link-btn">מדיניות הפרטיות ותנאי השימוש</button>
+              של הערוץ (חובה).
+            </span>
+          </label>
+          <label class="consent-row">
+            <input type="checkbox" id="agreeMailingCheckbox" checked />
+            <span>אני מאשר/ת קבלת עדכונים ודיוור במייל מהנהלת הערוץ (ניתן להסיר סימון כעת או בכל עת).</span>
+          </label>
+        </div>
+
         <button type="submit" id="gateSubmitBtn" class="btn btn-primary btn-full">התחבר לערוץ</button>
       </form>
 
@@ -109,6 +126,10 @@
           <strong id="adminEmailDisplay"></strong>
         </div>
         <div class="admin-bar-actions">
+          <button id="openAnalyticsBtn" class="btn btn-outline btn-with-icon" title="סטטיסטיקה, צפיות ודיוור">
+            <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="18" x2="18" y1="20" y2="10"/><line x1="12" x2="12" y1="20" y2="4"/><line x1="6" x2="6" y1="20" y2="14"/></svg>
+            <span>אנליטיקה ודיוור</span>
+          </button>
           <button id="openInboxBtn" class="btn btn-outline btn-with-icon" title="תיבת הודעות משוב">
             <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>
             <span>משובים</span>
@@ -118,6 +139,24 @@
             <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
             <span>פוסט חדש</span>
           </button>
+        </div>
+      </section>
+
+      <!-- חלונית התקדמות העלאה ברקע (גלויה גם לאחר סגירת חלון הפרסום) -->
+      <section id="uploadStatusWidget" class="upload-widget hidden" aria-live="polite">
+        <div class="upload-widget-top">
+          <strong id="uploadFileLabel">מעלה קובץ...</strong>
+          <div class="upload-widget-right">
+            <span id="uploadPercentText" class="upload-percent">0%</span>
+            <button type="button" id="cancelUploadBtn" class="btn btn-ghost btn-xs">ביטול</button>
+          </div>
+        </div>
+        <div class="upload-progress-track">
+          <div id="uploadProgressFill" class="upload-progress-fill" style="width: 0%"></div>
+        </div>
+        <div class="upload-widget-meta">
+          <span id="uploadBytesText">0 MB / 0 MB (נותר: 0 MB)</span>
+          <span id="uploadTimeText">עבר: 00:00 • נותר: מחשב...</span>
         </div>
       </section>
 
@@ -197,9 +236,9 @@
       </div>
 
       <!-- אזור ייעודי למודעת פרסומת -->
-      <div class="sidebar-card ad-slot-card">
+      <div class="sidebar-card ad-slot-card" id="adSlotCard">
         <span class="ad-badge">שטח פרסום</span>
-        <div class="ad-placeholder-box">
+        <div id="adSlotContainer" class="ad-placeholder-box">
           <svg class="icon-lg ad-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="14" x="3" y="5" rx="2"/><path d="M7 15h4"/><path d="M15 15h2"/><path d="M7 11h10"/></svg>
           <strong>מקום פנוי למודעה שלך</strong>
           <p>אזור פרסום קבוע ובולט לעסקים ומיזמים בערוץ המקום.</p>
@@ -302,6 +341,23 @@
           קישור לתמונת פרופיל / לוגו (אופציונלי)
           <input type="url" id="settingsAvatar" placeholder="https://..." />
         </label>
+        <div class="divider"><span>הגדרת מודעת פרסומת בצד שמאל</span></div>
+        <label>
+          כותרת המודעה
+          <input type="text" id="settingsAdTitle" placeholder="מקום פנוי למודעה שלך" />
+        </label>
+        <label>
+          תיאור המודעה
+          <textarea id="settingsAdDesc" rows="2" placeholder="טקסט קצר למודעה..."></textarea>
+        </label>
+        <label>
+          קישור לתמונת המודעה (אופציונלי)
+          <input type="url" id="settingsAdImage" placeholder="https://..." />
+        </label>
+        <label>
+          קישור יעד בלחיצה על המודעה (אופציונלי)
+          <input type="url" id="settingsAdLink" placeholder="https://..." />
+        </label>
         <div class="modal-footer">
           <button type="button" class="btn btn-ghost" data-close="settingsModal">ביטול</button>
           <button type="submit" class="btn btn-primary">שמור שינויים</button>
@@ -347,6 +403,62 @@
       </div>
       <div class="modal-body">
         <div id="inboxList" class="inbox-list"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- מודאל מדיניות פרטיות ותנאי שימוש -->
+  <div id="privacyModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="privacyModalTitle">
+    <div class="modal-backdrop" data-close="privacyModal"></div>
+    <div class="modal-card modal-lg">
+      <div class="modal-header">
+        <h2 id="privacyModalTitle">מדיניות פרטיות ותנאי שימוש — ערוץ המקום</h2>
+        <button class="icon-btn" data-close="privacyModal" aria-label="סגור">
+          <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+        </button>
+      </div>
+      <div class="modal-body legal-text">
+        <p><strong>1. כללי ושימוש בערוץ:</strong> הערוץ מיועד לציבור שומרי תורה ומצוות ופועל בהתאם לכללי הסינון והפיקוח של נטפרי. השימוש בערוץ מותר למשתמשים רשומים בלבד.</p>
+        <p><strong>2. איסוף מידע ושימוש בנתונים:</strong> בעת ההרשמה נשמרת כתובת האימייל שלך לצורך זיהוי והתחברות. בנוסף נאספים נתוני שימוש וצפייה בערוץ (כניסות, צפייה בפוסטים, אינטראקציות ולחיצות על קישורים ומודעות) לצורך שיפור השירות וניהול סטטיסטי של הערוץ.</p>
+        <p><strong>3. דיוור במייל והסכמה:</strong> אם השארת את סימון האישור לדיוור פעיל בעת ההרשמה, כתובת המייל שלך תצורף לרשימת התפוצה של הערוץ (כולל אפשרות צירוף לקבוצת עדכונים של Google Groups) לצורך קבלת עדכונים ותוכן מהנהלת הערוץ. ניתן להסיר את האישור בעת ההרשמה או לבקש הסרה בכל עת דרך טופס המשוב באתר או במייל חוזר.</p>
+        <p><strong>4. אבטחת מידע:</strong> הנתונים נשמרים בצורה מאובטחת ואינם נמכרים לצד שלישי.</p>
+      </div>
+      <div class="modal-footer" style="padding: 0 18px 16px;">
+        <button type="button" class="btn btn-primary" data-close="privacyModal">הבנתי, סגור</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- מודאל אנליטיקה ורשימת דיוור למנהל -->
+  <div id="analyticsModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="analyticsModalTitle">
+    <div class="modal-backdrop" data-close="analyticsModal"></div>
+    <div class="modal-card modal-xl">
+      <div class="modal-header">
+        <h2 id="analyticsModalTitle">לוח בקרה — אנליטיקה, מודעות ודיוור</h2>
+        <div class="analytics-header-controls">
+          <select id="analyticsRangeSelect" aria-label="טווח זמן">
+            <option value="all">כל הזמנים</option>
+            <option value="1">היום (24 שעות)</option>
+            <option value="7">7 ימים אחרונים</option>
+            <option value="30">30 ימים אחרונים</option>
+          </select>
+          <button class="icon-btn" data-close="analyticsModal" aria-label="סגור">
+            <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+          </button>
+        </div>
+      </div>
+      <div class="modal-body">
+        <div class="analytics-kpis" id="analyticsKpis"></div>
+
+        <div class="auth-tabs analytics-tabs" id="analyticsTabs">
+          <button type="button" class="auth-tab active" data-analytics-tab="posts">צפיות בפוסטים</button>
+          <button type="button" class="auth-tab" data-analytics-tab="links">מודעות וקישורים</button>
+          <button type="button" class="auth-tab" data-analytics-tab="mailing">רשימת דיוור (קבוצות 10)</button>
+        </div>
+
+        <div id="analyticsTabPosts" class="analytics-panel"></div>
+        <div id="analyticsTabLinks" class="analytics-panel hidden"></div>
+        <div id="analyticsTabMailing" class="analytics-panel hidden"></div>
       </div>
     </div>
   </div>

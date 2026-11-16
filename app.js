@@ -3,6 +3,7 @@ const HAS_SUPABASE = Boolean(CONFIG.SUPABASE_URL && CONFIG.SUPABASE_ANON_KEY);
 
 const state = {
   supabase: null,
+  session: null,
   isDemo: !HAS_SUPABASE,
   user: null,
   isAdmin: false,
@@ -10,7 +11,11 @@ const state = {
   settings: {
     title: CONFIG.DEFAULT_TITLE || 'המקום',
     description: CONFIG.DEFAULT_DESCRIPTION || 'עדכונים, סרטונים ותוכן נקי ומאושר',
-    avatar_url: ''
+    avatar_url: '',
+    ad_title: 'מקום פנוי למודעה שלך',
+    ad_description: 'אזור פרסום קבוע ובולט לעסקים ומיזמים בערוץ המקום.',
+    ad_image_url: '',
+    ad_link_url: ''
   },
   activeCategory: 'הכל',
   searchQuery: '',
@@ -18,16 +23,27 @@ const state = {
   signedUrlCache: {},
   reactedMap: {},
   feedbacks: [],
-  notificationsEnabled: false
+  notificationsEnabled: false,
+  activeUploadXhr: null,
+  loggedPageView: false,
+  seenPostsThisSession: new Set(),
+  seenAdThisSession: false,
+  analyticsTab: 'posts',
+  analyticsEvents: [],
+  mailingSubscribers: []
 };
 
 const DEMO_STORAGE_KEY = 'private_channel_demo_v1';
 const DEMO_FEEDBACK_KEY = 'hamakom_demo_feedback_v1';
+const DEMO_ANALYTICS_KEY = 'hamakom_demo_analytics_v1';
+const DEMO_MAILING_KEY = 'hamakom_demo_mailing_v1';
+const PENDING_MAILING_KEY = 'hamakom_pending_mailing_v1';
 const SCROLL_STORAGE_KEY = 'hamakom_scroll_anchor_v2';
 const BG_STORAGE_KEY = 'hamakom_bg_choice';
 const REACTED_STORAGE_KEY = 'hamakom_reacted_v1';
 const NOTIFY_STORAGE_KEY = 'hamakom_browser_notify';
 let hasRestoredInitialScroll = false;
+let viewObserver = null;
 
 // --- DOM Elements ---
 const el = {
@@ -53,6 +69,10 @@ const el = {
   gateEmail: document.getElementById('gateEmail'),
   gatePassword: document.getElementById('gatePassword'),
   toggleGatePassword: document.getElementById('toggleGatePassword'),
+  gateSignupExtras: document.getElementById('gateSignupExtras'),
+  agreeTermsCheckbox: document.getElementById('agreeTermsCheckbox'),
+  agreeMailingCheckbox: document.getElementById('agreeMailingCheckbox'),
+  openPrivacyModalBtn: document.getElementById('openPrivacyModalBtn'),
   gateSubmitBtn: document.getElementById('gateSubmitBtn'),
   gateOrDivider: document.getElementById('gateOrDivider'),
   gateGoogleBtn: document.getElementById('gateGoogleBtn'),
@@ -62,9 +82,19 @@ const el = {
   channelContent: document.getElementById('channelContent'),
   adminBar: document.getElementById('adminBar'),
   adminEmailDisplay: document.getElementById('adminEmailDisplay'),
+  openAnalyticsBtn: document.getElementById('openAnalyticsBtn'),
   openInboxBtn: document.getElementById('openInboxBtn'),
   inboxUnreadCount: document.getElementById('inboxUnreadCount'),
   newPostBtn: document.getElementById('newPostBtn'),
+  uploadStatusWidget: document.getElementById('uploadStatusWidget'),
+  uploadFileLabel: document.getElementById('uploadFileLabel'),
+  uploadPercentText: document.getElementById('uploadPercentText'),
+  cancelUploadBtn: document.getElementById('cancelUploadBtn'),
+  uploadProgressFill: document.getElementById('uploadProgressFill'),
+  uploadBytesText: document.getElementById('uploadBytesText'),
+  uploadTimeText: document.getElementById('uploadTimeText'),
+  adSlotCard: document.getElementById('adSlotCard'),
+  adSlotContainer: document.getElementById('adSlotContainer'),
   logoutBtn: document.getElementById('logoutBtn'),
   searchInput: document.getElementById('searchInput'),
   categoryChips: document.getElementById('categoryChips'),
@@ -96,6 +126,18 @@ const el = {
   settingsTitle: document.getElementById('settingsTitle'),
   settingsDesc: document.getElementById('settingsDesc'),
   settingsAvatar: document.getElementById('settingsAvatar'),
+  settingsAdTitle: document.getElementById('settingsAdTitle'),
+  settingsAdDesc: document.getElementById('settingsAdDesc'),
+  settingsAdImage: document.getElementById('settingsAdImage'),
+  settingsAdLink: document.getElementById('settingsAdLink'),
+
+  analyticsModal: document.getElementById('analyticsModal'),
+  analyticsRangeSelect: document.getElementById('analyticsRangeSelect'),
+  analyticsKpis: document.getElementById('analyticsKpis'),
+  analyticsTabs: document.getElementById('analyticsTabs'),
+  analyticsTabPosts: document.getElementById('analyticsTabPosts'),
+  analyticsTabLinks: document.getElementById('analyticsTabLinks'),
+  analyticsTabMailing: document.getElementById('analyticsTabMailing'),
 
   lightbox: document.getElementById('lightbox'),
   lightboxImg: document.getElementById('lightboxImg'),
@@ -161,10 +203,52 @@ function formatDayLabel(iso) {
 }
 
 function formatBytes(bytes) {
-  if (!bytes) return '';
+  if (!bytes) return '0 B';
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function formatDuration(seconds) {
+  const s = Math.max(0, Math.round(seconds || 0));
+  const mins = Math.floor(s / 60);
+  const secs = s % 60;
+  return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+}
+
+function translateAuthError(err, mode = 'signin') {
+  const raw = String(err?.message || err?.code || '').toLowerCase();
+
+  if (raw.includes('invalid login credentials') || raw.includes('invalid_credentials')) {
+    return 'לא נמצא חשבון עם הפרטים האלו, או שהסיסמה שגויה. אם עוד לא נרשמת אף פעם — קודם נרשמים בלשונית "הרשמה חדשה" ורק אחר כך נכנסים.';
+  }
+  if (raw.includes('user already registered') || raw.includes('already been registered')) {
+    return 'כתובת המייל הזו כבר רשומה בערוץ! עבור ללשונית "התחברות" כדי להיכנס.';
+  }
+  if (raw.includes('email not confirmed')) {
+    return 'כתובת המייל עדיין ממתינה לאישור במערכת. יש לבטל את חובת אימות המייל בהגדרות האבטחה או לאשר את המשתמש.';
+  }
+  if (raw.includes('password') && (raw.includes('least') || raw.includes('short') || raw.includes('6'))) {
+    return 'הסיסמה חייבת להכיל לפחות 6 תווים.';
+  }
+  if (raw.includes('weak_password')) {
+    return 'הסיסמה חלשה מדי. בחר סיסמה חזקה יותר עם לפחות 6 תווים.';
+  }
+  if (raw.includes('unable to validate email') || raw.includes('invalid email') || raw.includes('email_address_invalid')) {
+    return 'כתובת האימייל שהוזנה אינה תקינה. בדוק שאין שגיאת הקלדה.';
+  }
+  if (raw.includes('rate limit') || raw.includes('too many requests') || raw.includes('429')) {
+    return 'בוצעו יותר מדי ניסיונות בדקות האחרונות. אנא המתן רגע ונסה שוב.';
+  }
+  if (raw.includes('signup is disabled') || raw.includes('signups not allowed')) {
+    return 'ההרשמה לחשבון חדש סגורה כרגע במערכת.';
+  }
+  if (raw.includes('network') || raw.includes('fetch')) {
+    return 'אין תקשורת עם השרת כרגע. בדוק את חיבור האינטרנט ונסה שוב.';
+  }
+  return mode === 'signup'
+    ? 'לא הצלחנו להשלים את ההרשמה כרגע. בדוק שכתובת המייל תקינה והסיסמה בת 6 תווים לפחות.'
+    : 'לא הצלחנו לחבר אותך כרגע. אם עדיין לא נרשמת, עבור ללשונית "הרשמה חדשה" והירשם תחילה.';
 }
 
 function showToast(message, type = 'info') {
@@ -431,7 +515,92 @@ async function initSupabase() {
     .subscribe();
 }
 
+async function syncPendingMailingConsent(user) {
+  if (!user || !user.email) return;
+  const raw = localStorage.getItem(PENDING_MAILING_KEY);
+  if (!raw) return;
+  try {
+    const parsed = JSON.parse(raw);
+    if (parsed.email !== user.email) return;
+    await saveMailingRecord(user.email, parsed.acceptedTerms, parsed.acceptedMailing);
+    localStorage.removeItem(PENDING_MAILING_KEY);
+  } catch {
+    localStorage.removeItem(PENDING_MAILING_KEY);
+  }
+}
+
+async function saveMailingRecord(email, acceptedTerms, acceptedMailing) {
+  if (!email) return;
+  if (state.isDemo) {
+    let list = [];
+    try {
+      list = JSON.parse(localStorage.getItem(DEMO_MAILING_KEY) || '[]');
+    } catch {
+      list = [];
+    }
+    const existing = list.find((item) => item.email === email);
+    if (existing) {
+      existing.accepted_terms = acceptedTerms;
+      existing.accepted_mailing = acceptedMailing;
+    } else {
+      list.push({
+        id: Date.now(),
+        email,
+        accepted_terms: acceptedTerms,
+        accepted_mailing: acceptedMailing,
+        batch_notified: false,
+        consented_at: new Date().toISOString()
+      });
+    }
+    localStorage.setItem(DEMO_MAILING_KEY, JSON.stringify(list));
+    return;
+  }
+
+  if (!state.supabase) return;
+  await state.supabase.from('mailing_subscribers').upsert(
+    {
+      email,
+      user_id: state.user?.id || null,
+      accepted_terms: acceptedTerms,
+      accepted_mailing: acceptedMailing
+    },
+    { onConflict: 'email' }
+  );
+}
+
+async function logAnalyticsEvent(eventType, details = {}) {
+  if (!state.user) return;
+  const row = {
+    event_type: eventType,
+    post_id: details.post_id ? Number(details.post_id) : null,
+    target_url: details.target_url || '',
+    target_label: details.target_label || ''
+  };
+
+  if (state.isDemo) {
+    let list = [];
+    try {
+      list = JSON.parse(localStorage.getItem(DEMO_ANALYTICS_KEY) || '[]');
+    } catch {
+      list = [];
+    }
+    list.push({
+      id: Date.now() + Math.random(),
+      ...row,
+      user_id: state.user.id || 'demo-user-1',
+      user_email: state.user.email || 'demo@admin.local',
+      created_at: new Date().toISOString()
+    });
+    localStorage.setItem(DEMO_ANALYTICS_KEY, JSON.stringify(list.slice(-1000)));
+    return;
+  }
+
+  if (!state.supabase) return;
+  await state.supabase.from('analytics_events').insert(row);
+}
+
 async function handleAuthChange(session) {
+  state.session = session || null;
   state.user = session?.user || null;
   state.isAdmin = false;
 
@@ -442,14 +611,22 @@ async function handleAuthChange(session) {
       .eq('email', state.user.email)
       .maybeSingle();
     state.isAdmin = Boolean(data);
+    await syncPendingMailingConsent(state.user);
   }
 
   if (state.user) {
+    if (!state.loggedPageView) {
+      state.loggedPageView = true;
+      logAnalyticsEvent('page_view', { target_label: 'כניסה לערוץ' });
+    }
     await fetchLiveData();
     if (state.isAdmin) await fetchFeedbacks();
   } else {
     state.posts = [];
     state.feedbacks = [];
+    state.loggedPageView = false;
+    state.seenPostsThisSession.clear();
+    state.seenAdThisSession = false;
     hasRestoredInitialScroll = false;
     await fetchSettingsOnly();
   }
@@ -523,6 +700,27 @@ async function fetchLiveData(opts = {}) {
 }
 
 // --- Render UI ---
+function renderAdSlot() {
+  if (!el.adSlotContainer) return;
+  const title = state.settings.ad_title || 'מקום פנוי למודעה שלך';
+  const desc = state.settings.ad_description || 'אזור פרסום קבוע ובולט לעסקים ומיזמים בערוץ המקום.';
+  const imgUrl = (state.settings.ad_image_url || '').trim();
+  const linkUrl = (state.settings.ad_link_url || '').trim();
+
+  const innerHtml = `
+    ${imgUrl ? `<img class="ad-live-img" src="${escapeHtml(imgUrl)}" alt="${escapeHtml(title)}" loading="lazy" />` : `<svg class="icon-lg ad-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="14" x="3" y="5" rx="2"/><path d="M7 15h4"/><path d="M15 15h2"/><path d="M7 11h10"/></svg>`}
+    <strong>${escapeHtml(title)}</strong>
+    ${desc ? `<p>${escapeHtml(desc)}</p>` : ''}
+  `;
+
+  if (linkUrl) {
+    el.adSlotContainer.outerHTML = `<a id="adSlotContainer" class="ad-live-card" href="${escapeHtml(linkUrl)}" target="_blank" rel="noopener noreferrer">${innerHtml}</a>`;
+  } else {
+    el.adSlotContainer.outerHTML = `<div id="adSlotContainer" class="ad-placeholder-box">${innerHtml}</div>`;
+  }
+  el.adSlotContainer = document.getElementById('adSlotContainer');
+}
+
 function renderHeader() {
   document.title = state.settings.title;
   el.channelTitle.textContent = state.settings.title;
@@ -534,6 +732,7 @@ function renderHeader() {
   } else {
     el.channelAvatar.textContent = (state.settings.title || 'ה').trim().charAt(0);
   }
+  renderAdSlot();
 }
 
 function renderStats() {
@@ -840,6 +1039,43 @@ function renderFeed(options = {}) {
   } else if (options.scrollToBottom && !window.location.hash.startsWith('#post-')) {
     scrollToFeedBottom(true);
   }
+
+  observeVisibleElements();
+}
+
+function observeVisibleElements() {
+  if (!('IntersectionObserver' in window) || !state.user) return;
+  if (viewObserver) viewObserver.disconnect();
+
+  viewObserver = new IntersectionObserver(
+    (entries) => {
+      entries.forEach((entry) => {
+        if (!entry.isIntersecting) return;
+        const node = entry.target;
+        if (node.id === 'adSlotCard') {
+          if (!state.seenAdThisSession) {
+            state.seenAdThisSession = true;
+            logAnalyticsEvent('ad_view', {
+              target_label: state.settings.ad_title || 'מודעת צד',
+              target_url: state.settings.ad_link_url || ''
+            });
+          }
+          return;
+        }
+        if (node.classList.contains('post-card')) {
+          const postId = node.id.replace('post-', '');
+          if (postId && !state.seenPostsThisSession.has(postId)) {
+            state.seenPostsThisSession.add(postId);
+            logAnalyticsEvent('post_view', { post_id: postId });
+          }
+        }
+      });
+    },
+    { threshold: 0.45 }
+  );
+
+  el.feedContainer.querySelectorAll('.post-card').forEach((card) => viewObserver.observe(card));
+  if (el.adSlotCard) viewObserver.observe(el.adSlotCard);
 }
 
 // --- Actions ---
@@ -948,76 +1184,186 @@ function openPostModal(post = null) {
   openModal('postModal');
 }
 
+function uploadFileWithProgress(file, path) {
+  return new Promise((resolve, reject) => {
+    const token = state.session?.access_token;
+    if (!token) {
+      reject(new Error('פג תוקף ההתחברות — יש להתחבר מחדש כדי להעלות קבצים.'));
+      return;
+    }
+
+    const url = `${CONFIG.SUPABASE_URL}/storage/v1/object/channel-media/${path}`;
+    const xhr = new XMLHttpRequest();
+    state.activeUploadXhr = xhr;
+    const startedAt = Date.now();
+
+    el.uploadStatusWidget.classList.remove('hidden');
+    el.uploadFileLabel.textContent = `מעלה ברקע: ${file.name}`;
+    el.uploadPercentText.textContent = '0%';
+    el.uploadProgressFill.style.width = '0%';
+    el.uploadBytesText.textContent = `0 MB / ${formatBytes(file.size)}`;
+    el.uploadTimeText.textContent = 'עבר: 00:00 • נותר: מחשב...';
+
+    xhr.open('POST', url, true);
+    xhr.setRequestHeader('apikey', CONFIG.SUPABASE_ANON_KEY);
+    xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+    xhr.setRequestHeader('x-upsert', 'false');
+    if (file.type) {
+      xhr.setRequestHeader('Content-Type', file.type);
+    }
+
+    xhr.upload.onprogress = (evt) => {
+      if (!evt.lengthComputable) return;
+      const pct = Math.min(100, Math.round((evt.loaded / evt.total) * 100));
+      const elapsedSec = (Date.now() - startedAt) / 1000;
+      const speed = elapsedSec > 0.2 ? evt.loaded / elapsedSec : 0;
+      const remainingBytes = Math.max(0, evt.total - evt.loaded);
+      const etaSec = speed > 0 ? remainingBytes / speed : 0;
+
+      el.uploadPercentText.textContent = `${pct}%`;
+      el.uploadProgressFill.style.width = `${pct}%`;
+      el.uploadBytesText.textContent = `${formatBytes(evt.loaded)} / ${formatBytes(evt.total)} (נותר: ${formatBytes(remainingBytes)})`;
+      el.uploadTimeText.textContent = `עבר: ${formatDuration(elapsedSec)} • נותר: ${speed > 0 ? formatDuration(etaSec) : 'מחשב...'}`;
+    };
+
+    xhr.onload = () => {
+      state.activeUploadXhr = null;
+      el.uploadStatusWidget.classList.add('hidden');
+      if (xhr.status >= 200 && xhr.status < 300) {
+        resolve(`storage://${path}`);
+      } else {
+        let msg = 'שגיאה בהעלאת הקובץ לשרת.';
+        try {
+          const parsed = JSON.parse(xhr.responseText);
+          if (parsed?.message) msg = parsed.message;
+        } catch {
+          // ignore
+        }
+        reject(new Error(msg));
+      }
+    };
+
+    xhr.onerror = () => {
+      state.activeUploadXhr = null;
+      el.uploadStatusWidget.classList.add('hidden');
+      reject(new Error('שגיאת רשת בזמן העלאת הקובץ.'));
+    };
+
+    xhr.onabort = () => {
+      state.activeUploadXhr = null;
+      el.uploadStatusWidget.classList.add('hidden');
+      reject(new Error('__ABORTED__'));
+    };
+
+    xhr.send(file);
+  });
+}
+
+async function commitPostPayload(id, payload) {
+  if (state.isDemo) {
+    if (id) {
+      const idx = state.posts.findIndex((p) => String(p.id) === String(id));
+      if (idx !== -1) state.posts[idx] = { ...state.posts[idx], ...payload };
+    } else {
+      state.posts.push({
+        id: Date.now(),
+        ...payload,
+        reactions: { '👍': 0, '❤️': 0, '🔥': 0 },
+        created_at: new Date().toISOString()
+      });
+    }
+    saveDemoData();
+    renderCategories();
+    renderFeed({ scrollToBottom: !id });
+    return;
+  }
+
+  if (id) {
+    const { error } = await state.supabase.from('posts').update(payload).eq('id', id);
+    if (error) throw error;
+  } else {
+    const { error } = await state.supabase.from('posts').insert(payload);
+    if (error) throw error;
+  }
+  await fetchLiveData({ skipInitialRestore: true });
+  if (!id) scrollToFeedBottom(true);
+}
+
 async function savePost(e) {
   e.preventDefault();
   el.postFormError.classList.add('hidden');
-  el.savePostBtn.disabled = true;
-  el.savePostBtn.textContent = 'מעלה ושומר...';
 
-  try {
-    const id = el.editPostId.value;
-    const mediaType = el.postMediaType.value;
-    let mediaUrl = el.postMediaUrl.value.trim();
-    let mediaName = el.postMediaName.value.trim();
-    const file = el.postMediaFile.files[0];
+  const id = el.editPostId.value;
+  const mediaType = el.postMediaType.value;
+  const rawUrl = el.postMediaUrl.value.trim();
+  const rawName = el.postMediaName.value.trim();
+  const file = el.postMediaFile.files[0];
+  const content = el.postContent.value.trim();
+  const category = el.postCategory.value;
+  const isPinned = el.postPinned.checked;
 
-    if (mediaType !== 'none' && file) {
-      if (state.isDemo) {
-        mediaUrl = URL.createObjectURL(file);
-        if (!mediaName) mediaName = file.name;
-      } else {
-        const ext = file.name.split('.').pop();
-        const path = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-        const { error: uploadErr } = await state.supabase.storage
-          .from('channel-media')
-          .upload(path, file);
-        if (uploadErr) throw uploadErr;
+  if (!content && !rawUrl && !(mediaType !== 'none' && file)) {
+    el.postFormError.textContent = 'יש להזין טקסט או לצרף מדיה.';
+    el.postFormError.classList.remove('hidden');
+    return;
+  }
 
-        mediaUrl = `storage://${path}`;
-        if (!mediaName) mediaName = file.name;
-      }
+  if (mediaType !== 'none' && file && !state.isDemo) {
+    if (state.activeUploadXhr) {
+      el.postFormError.textContent = 'יש כבר העלאה פעילה ברקע, המתן לסיומה או בטל אותה.';
+      el.postFormError.classList.remove('hidden');
+      return;
     }
 
-    const payload = {
-      content: el.postContent.value.trim(),
-      category: el.postCategory.value,
-      is_pinned: el.postPinned.checked,
+    // סוגרים מיד את חלון העריכה כדי שהמנהל יוכל להמשיך לגלוש בזמן שהקובץ עולה ברקע!
+    closeModal('postModal');
+    showToast('ההעלאה התחילה ברקע — אפשר להמשיך לגלוש כרגיל');
+
+    const rawExt = file.name.includes('.') ? file.name.split('.').pop() : 'bin';
+    const ext = rawExt.replace(/[^a-zA-Z0-9]/g, '').toLowerCase() || 'bin';
+    const path = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+    try {
+      const uploadedPath = await uploadFileWithProgress(file, path);
+      await commitPostPayload(id, {
+        content,
+        category,
+        is_pinned: isPinned,
+        media_type: mediaType,
+        media_url: uploadedPath,
+        media_name: rawName || file.name,
+        updated_at: new Date().toISOString()
+      });
+      showToast(id ? 'הפוסט עודכן בהצלחה!' : 'הקובץ הועלה והפוסט פורסם!', 'success');
+    } catch (err) {
+      if (err.message === '__ABORTED__') {
+        showToast('העלאת הקובץ בוטלה');
+      } else {
+        showToast(err.message || 'שגיאה בהעלאה ברקע', 'error');
+      }
+    }
+    return;
+  }
+
+  el.savePostBtn.disabled = true;
+  el.savePostBtn.textContent = 'שומר...';
+
+  try {
+    let mediaUrl = rawUrl;
+    let mediaName = rawName;
+    if (mediaType !== 'none' && file && state.isDemo) {
+      mediaUrl = URL.createObjectURL(file);
+      if (!mediaName) mediaName = file.name;
+    }
+
+    await commitPostPayload(id, {
+      content,
+      category,
+      is_pinned: isPinned,
       media_type: mediaType,
       media_url: mediaType === 'none' ? '' : mediaUrl,
       media_name: mediaType === 'none' ? '' : mediaName,
       updated_at: new Date().toISOString()
-    };
-
-    if (!payload.content && !payload.media_url) {
-      throw new Error('יש להזין טקסט או לצרף מדיה.');
-    }
-
-    if (state.isDemo) {
-      if (id) {
-        const idx = state.posts.findIndex((p) => String(p.id) === String(id));
-        if (idx !== -1) state.posts[idx] = { ...state.posts[idx], ...payload };
-      } else {
-        state.posts.push({
-          id: Date.now(),
-          ...payload,
-          reactions: { '👍': 0, '❤️': 0, '🔥': 0 },
-          created_at: new Date().toISOString()
-        });
-      }
-      saveDemoData();
-      renderCategories();
-      renderFeed({ scrollToBottom: !id });
-    } else {
-      if (id) {
-        const { error } = await state.supabase.from('posts').update(payload).eq('id', id);
-        if (error) throw error;
-      } else {
-        const { error } = await state.supabase.from('posts').insert(payload);
-        if (error) throw error;
-      }
-      await fetchLiveData({ skipInitialRestore: true });
-      if (!id) scrollToFeedBottom(true);
-    }
+    });
 
     closeModal('postModal');
     showToast(id ? 'הפוסט עודכן בהצלחה' : 'הפוסט פורסם בערוץ!', 'success');
@@ -1191,6 +1537,223 @@ async function deleteFeedback(id) {
   if (!error) await fetchFeedbacks();
 }
 
+// --- Admin Analytics & Mailing Dashboard ---
+async function openAnalyticsDashboard() {
+  if (!state.isAdmin) return;
+  openModal('analyticsModal');
+  el.analyticsKpis.innerHTML = '<div class="inbox-empty">טוען נתוני אנליטיקה...</div>';
+
+  if (state.isDemo) {
+    try {
+      state.analyticsEvents = JSON.parse(localStorage.getItem(DEMO_ANALYTICS_KEY) || '[]');
+    } catch {
+      state.analyticsEvents = [];
+    }
+    try {
+      state.mailingSubscribers = JSON.parse(localStorage.getItem(DEMO_MAILING_KEY) || '[]');
+    } catch {
+      state.mailingSubscribers = [];
+    }
+    renderAnalyticsDashboard();
+    return;
+  }
+
+  const [evRes, mailRes] = await Promise.all([
+    state.supabase
+      .from('analytics_events')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(5000),
+    state.supabase
+      .from('mailing_subscribers')
+      .select('*')
+      .order('consented_at', { ascending: false })
+  ]);
+
+  state.analyticsEvents = evRes.data || [];
+  state.mailingSubscribers = mailRes.data || [];
+  renderAnalyticsDashboard();
+}
+
+function renderAnalyticsDashboard() {
+  const rangeVal = el.analyticsRangeSelect?.value || 'all';
+  const nowMs = Date.now();
+  const cutoffMs =
+    rangeVal === 'all' ? 0 : nowMs - Number(rangeVal) * 24 * 60 * 60 * 1000;
+
+  const events = state.analyticsEvents.filter(
+    (ev) => new Date(ev.created_at).getTime() >= cutoffMs
+  );
+
+  const countStats = (type) => {
+    const matching = events.filter((e) => e.event_type === type);
+    const uniqueUsers = new Set(matching.map((e) => e.user_id || e.user_email)).size;
+    return { total: matching.length, unique: uniqueUsers };
+  };
+
+  const pageViews = countStats('page_view');
+  const postViews = countStats('post_view');
+  const adViews = countStats('ad_view');
+  const adClicks = countStats('ad_click');
+  const linkClicks = countStats('link_click');
+  const totalClicks = adClicks.total + linkClicks.total;
+  const uniqueClickers = new Set(
+    events
+      .filter((e) => e.event_type === 'ad_click' || e.event_type === 'link_click')
+      .map((e) => e.user_id || e.user_email)
+  ).size;
+  const adCtr = adViews.total > 0 ? ((adClicks.total / adViews.total) * 100).toFixed(1) : '0.0';
+
+  el.analyticsKpis.innerHTML = `
+    <div class="kpi-card">
+      <span class="kpi-label">כניסות לערוץ</span>
+      <span class="kpi-value">${pageViews.total}</span>
+      <span class="kpi-sub">ייחודיים: ${pageViews.unique} משתמשים</span>
+    </div>
+    <div class="kpi-card">
+      <span class="kpi-label">צפיות בפוסטים</span>
+      <span class="kpi-value">${postViews.total}</span>
+      <span class="kpi-sub">צופים ייחודיים: ${postViews.unique}</span>
+    </div>
+    <div class="kpi-card">
+      <span class="kpi-label">צפיות במודעת הצד</span>
+      <span class="kpi-value">${adViews.total}</span>
+      <span class="kpi-sub">ייחודיים: ${adViews.unique} • הקלקות: ${adClicks.total} (${adCtr}%)</span>
+    </div>
+    <div class="kpi-card">
+      <span class="kpi-label">לחיצות (קישורים ומודעות)</span>
+      <span class="kpi-value">${totalClicks}</span>
+      <span class="kpi-sub">ייחודיים: ${uniqueClickers} • קישורים בפוסטים: ${linkClicks.total}</span>
+    </div>
+  `;
+
+  // Tab 1: Posts Breakdown
+  const postRows = [...state.posts].reverse().map((post) => {
+    const pv = events.filter((e) => e.event_type === 'post_view' && String(e.post_id) === String(post.id));
+    const lc = events.filter((e) => e.event_type === 'link_click' && String(e.post_id) === String(post.id));
+    const uniquePv = new Set(pv.map((e) => e.user_id || e.user_email)).size;
+    const uniqueLc = new Set(lc.map((e) => e.user_id || e.user_email)).size;
+    const snippet = escapeHtml((post.content || post.media_name || 'ללא טקסט').slice(0, 48));
+    return `
+      <tr>
+        <td>${snippet}</td>
+        <td>${escapeHtml(post.category || 'כללי')}</td>
+        <td><strong>${pv.length}</strong></td>
+        <td>${uniquePv}</td>
+        <td>${lc.length} (${uniqueLc} ייחודיים)</td>
+      </tr>`;
+  });
+
+  el.analyticsTabPosts.innerHTML = postRows.length
+    ? `<table class="analytics-table">
+         <thead><tr><th>פוסט</th><th>קטגוריה</th><th>צפיות (סה"כ)</th><th>צופים ייחודיים</th><th>קליקים בקישורים</th></tr></thead>
+         <tbody>${postRows.join('')}</tbody>
+       </table>`
+    : '<div class="inbox-empty">אין עדיין נתוני צפייה בפוסטים.</div>';
+
+  // Tab 2: Ads & Links Breakdown
+  const linkMap = new Map();
+  events
+    .filter((e) => e.event_type === 'ad_click' || e.event_type === 'link_click')
+    .forEach((e) => {
+      const key = `${e.event_type}|${e.target_url || e.target_label}`;
+      if (!linkMap.has(key)) {
+        linkMap.set(key, {
+          type: e.event_type === 'ad_click' ? 'מודעת צד' : 'קישור בפוסט',
+          url: e.target_url || e.target_label || 'קישור',
+          total: 0,
+          users: new Set()
+        });
+      }
+      const entry = linkMap.get(key);
+      entry.total += 1;
+      entry.users.add(e.user_id || e.user_email);
+    });
+
+  const linkRows = [...linkMap.values()]
+    .sort((a, b) => b.total - a.total)
+    .map(
+      (item) => `
+      <tr>
+        <td>${escapeHtml(item.type)}</td>
+        <td style="max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(item.url)}</td>
+        <td><strong>${item.total}</strong></td>
+        <td>${item.users.size}</td>
+      </tr>`
+    );
+
+  el.analyticsTabLinks.innerHTML = linkRows.length
+    ? `<table class="analytics-table">
+         <thead><tr><th>סוג</th><th>יעד / כתובת</th><th>סך קליקים</th><th>קליקים ייחודיים</th></tr></thead>
+         <tbody>${linkRows.join('')}</tbody>
+       </table>`
+    : '<div class="inbox-empty">אין עדיין קליקים על מודעות או קישורים בטווח שנבחר.</div>';
+
+  // Tab 3: Mailing Subscribers
+  const consented = state.mailingSubscribers.filter((s) => s.accepted_mailing);
+  const pending = consented.filter((s) => !s.batch_notified);
+  const nextBatch = pending.slice(0, 10);
+
+  el.analyticsTabMailing.innerHTML = `
+    <div class="mailing-batch-box">
+      <div>
+        <strong>סה"כ מאשרי דיוור: ${consented.length}</strong> •
+        ממתינים לצירוף לקבוצת Google: <strong>${pending.length}</strong>
+        (מתוך מנת 10 הבאה: ${Math.min(10, pending.length)}/10)
+      </div>
+      <div class="mailing-batch-actions">
+        <button type="button" class="btn btn-primary btn-xs" id="copyMailingBatchBtn" ${nextBatch.length === 0 ? 'disabled' : ''}>העתק ${nextBatch.length || 10} כתובות הבאות</button>
+        <button type="button" class="btn btn-outline btn-xs" id="markMailingBatchBtn" ${nextBatch.length === 0 ? 'disabled' : ''}>סמן כצורפו</button>
+      </div>
+    </div>
+    ${
+      consented.length
+        ? `<table class="analytics-table">
+             <thead><tr><th>אימייל</th><th>תאריך אישור</th><th>סטטוס קבוצה</th></tr></thead>
+             <tbody>${consented
+               .map(
+                 (s) => `
+                 <tr>
+                   <td>${escapeHtml(s.email)}</td>
+                   <td>${escapeHtml(formatDayLabel(s.consented_at))} • ${escapeHtml(formatDate(s.consented_at))}</td>
+                   <td>${s.batch_notified ? 'נשלח / צורף ✓' : 'ממתין בקבוצה'}</td>
+                 </tr>`
+               )
+               .join('')}</tbody>
+           </table>`
+        : '<div class="inbox-empty">עדיין אין נרשמים שאישרו דיוור.</div>'
+    }
+  `;
+
+  document.getElementById('copyMailingBatchBtn')?.addEventListener('click', () => {
+    const emails = nextBatch.map((s) => s.email).join(', ');
+    navigator.clipboard?.writeText(emails);
+    showToast(`הועתקו ${nextBatch.length} כתובות מייל ללוח!`, 'success');
+  });
+
+  document.getElementById('markMailingBatchBtn')?.addEventListener('click', async () => {
+    const ids = nextBatch.map((s) => s.id);
+    if (ids.length === 0) return;
+    if (state.isDemo) {
+      state.mailingSubscribers.forEach((s) => {
+        if (ids.includes(s.id)) s.batch_notified = true;
+      });
+      localStorage.setItem(DEMO_MAILING_KEY, JSON.stringify(state.mailingSubscribers));
+      renderAnalyticsDashboard();
+      showToast('סומן כצורף בהצלחה');
+      return;
+    }
+    const { error } = await state.supabase
+      .from('mailing_subscribers')
+      .update({ batch_notified: true })
+      .in('id', ids);
+    if (!error) {
+      await openAnalyticsDashboard();
+      showToast('סומן כצורף בהצלחה', 'success');
+    }
+  });
+}
+
 // --- Event Listeners ---
 function bindEvents() {
   document.querySelectorAll('[data-close]').forEach((node) => {
@@ -1225,11 +1788,15 @@ function bindEvents() {
     state.gateMode = tab.dataset.authTab;
     el.gateAuthTabs.querySelectorAll('.auth-tab').forEach((t) => t.classList.remove('active'));
     tab.classList.add('active');
-    el.gateSubmitBtn.textContent = state.gateMode === 'signup' ? 'הרשמה לערוץ' : 'התחבר לערוץ';
-    el.gatePassword.autocomplete = state.gateMode === 'signup' ? 'new-password' : 'current-password';
+    const isSignup = state.gateMode === 'signup';
+    el.gateSubmitBtn.textContent = isSignup ? 'הרשמה לערוץ' : 'התחבר לערוץ';
+    el.gatePassword.autocomplete = isSignup ? 'new-password' : 'current-password';
+    el.gateSignupExtras?.classList.toggle('hidden', !isSignup);
     el.gateError.classList.add('hidden');
     el.gateSuccess.classList.add('hidden');
   });
+
+  el.openPrivacyModalBtn?.addEventListener('click', () => openModal('privacyModal'));
 
   // Gate Login / Signup
   el.gateLoginForm.addEventListener('submit', async (e) => {
@@ -1243,15 +1810,31 @@ function bindEvents() {
       const password = el.gatePassword.value;
 
       if (state.gateMode === 'signup') {
+        if (!el.agreeTermsCheckbox?.checked) {
+          el.gateError.textContent = 'כדי להירשם לערוץ יש לאשר את מדיניות הפרטיות ותנאי השימוש.';
+          el.gateError.classList.remove('hidden');
+          return;
+        }
+
+        const acceptedTerms = true;
+        const acceptedMailing = Boolean(el.agreeMailingCheckbox?.checked);
+        localStorage.setItem(
+          PENDING_MAILING_KEY,
+          JSON.stringify({ email, acceptedTerms, acceptedMailing })
+        );
+
         const { data, error } = await state.supabase.auth.signUp({ email, password });
         if (error) {
-          el.gateError.textContent = error.message;
+          el.gateError.textContent = translateAuthError(error, 'signup');
           el.gateError.classList.remove('hidden');
         } else if (data.session) {
           await handleAuthChange(data.session);
-          showToast('נרשמת והתחברת בהצלחה!', 'success');
+          showToast('נרשמת והתחברת לערוץ בהצלחה!', 'success');
+        } else if (data.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) {
+          el.gateError.textContent = 'כתובת המייל הזו כבר רשומה בערוץ! עבור ללשונית "התחברות" כדי להיכנס.';
+          el.gateError.classList.remove('hidden');
         } else {
-          el.gateSuccess.textContent = 'נשלח אליך מייל אימות! אשר את הכתובת כדי להיכנס לערוץ.';
+          el.gateSuccess.textContent = 'החשבון נוצר! ניתן לעבור כעת ללשונית "התחברות" ולהיכנס (אם אימות המייל פעיל בשרת, יש לאשר את הקישור במייל).';
           el.gateSuccess.classList.remove('hidden');
         }
         return;
@@ -1259,7 +1842,7 @@ function bindEvents() {
 
       const { data, error } = await state.supabase.auth.signInWithPassword({ email, password });
       if (error) {
-        el.gateError.textContent = 'אימייל או סיסמה שגויים.';
+        el.gateError.textContent = translateAuthError(error, 'signin');
         el.gateError.classList.remove('hidden');
       } else {
         await handleAuthChange(data.session);
@@ -1299,12 +1882,23 @@ function bindEvents() {
 
   // Gate Demo Mode
   el.gateDemoBtn.addEventListener('click', () => {
-    state.user = { email: 'demo@admin.local' };
+    state.user = { id: 'demo-admin', email: 'demo@admin.local' };
     state.isAdmin = true;
+    if (!state.loggedPageView) {
+      state.loggedPageView = true;
+      logAnalyticsEvent('page_view', { target_label: 'כניסה לערוץ' });
+    }
     renderAuthUI();
     renderCategories();
     loadDemoFeedbacks();
     renderFeed({ restoreScroll: !hasRestoredInitialScroll });
+  });
+
+  // Cancel background upload
+  el.cancelUploadBtn?.addEventListener('click', () => {
+    if (state.activeUploadXhr) {
+      state.activeUploadXhr.abort();
+    }
   });
 
   // Logout
@@ -1356,11 +1950,15 @@ function bindEvents() {
 
   el.postForm.addEventListener('submit', savePost);
 
-  // Settings
+  // Settings (including side ad banner)
   el.adminSettingsBtn.addEventListener('click', () => {
     el.settingsTitle.value = state.settings.title;
     el.settingsDesc.value = state.settings.description;
     el.settingsAvatar.value = state.settings.avatar_url || '';
+    el.settingsAdTitle.value = state.settings.ad_title || '';
+    el.settingsAdDesc.value = state.settings.ad_description || '';
+    el.settingsAdImage.value = state.settings.ad_image_url || '';
+    el.settingsAdLink.value = state.settings.ad_link_url || '';
     openModal('settingsModal');
   });
 
@@ -1369,7 +1967,11 @@ function bindEvents() {
     const updated = {
       title: el.settingsTitle.value.trim(),
       description: el.settingsDesc.value.trim(),
-      avatar_url: el.settingsAvatar.value.trim()
+      avatar_url: el.settingsAvatar.value.trim(),
+      ad_title: el.settingsAdTitle.value.trim() || 'מקום פנוי למודעה שלך',
+      ad_description: el.settingsAdDesc.value.trim(),
+      ad_image_url: el.settingsAdImage.value.trim(),
+      ad_link_url: el.settingsAdLink.value.trim()
     };
     if (state.isDemo) {
       state.settings = { ...state.settings, ...updated };
@@ -1386,7 +1988,7 @@ function bindEvents() {
       }
     }
     closeModal('settingsModal');
-    showToast('הגדרות הערוץ נשמרו', 'success');
+    showToast('הגדרות הערוץ והמודעה נשמרו', 'success');
   });
 
   // Feed Delegation
@@ -1429,6 +2031,18 @@ function bindEvents() {
         wrap.classList.toggle('is-collapsed', !expanded);
         readMoreBtn.textContent = expanded ? 'צמצם קריאה' : 'המשך קריאה';
       }
+      return;
+    }
+
+    const linkEl = e.target.closest('.post-content a, .file-attachment');
+    if (linkEl) {
+      const card = linkEl.closest('.post-card');
+      const postId = card ? card.id.replace('post-', '') : null;
+      logAnalyticsEvent('link_click', {
+        post_id: postId,
+        target_url: linkEl.getAttribute('href') || '',
+        target_label: (linkEl.textContent || '').trim().slice(0, 60)
+      });
       return;
     }
 
@@ -1492,6 +2106,30 @@ function bindEvents() {
     }
   });
 
+  // Side Ad Click tracking
+  el.adSlotCard?.addEventListener('click', (e) => {
+    const link = e.target.closest('a.ad-live-card');
+    if (!link) return;
+    logAnalyticsEvent('ad_click', {
+      target_url: link.getAttribute('href') || '',
+      target_label: state.settings.ad_title || 'מודעת צד'
+    });
+  });
+
+  // Analytics & Mailing Dashboard
+  el.openAnalyticsBtn?.addEventListener('click', openAnalyticsDashboard);
+  el.analyticsRangeSelect?.addEventListener('change', renderAnalyticsDashboard);
+  el.analyticsTabs?.addEventListener('click', (e) => {
+    const tab = e.target.closest('[data-analytics-tab]');
+    if (!tab) return;
+    state.analyticsTab = tab.dataset.analyticsTab;
+    el.analyticsTabs.querySelectorAll('.auth-tab').forEach((t) => t.classList.remove('active'));
+    tab.classList.add('active');
+    el.analyticsTabPosts.classList.toggle('hidden', state.analyticsTab !== 'posts');
+    el.analyticsTabLinks.classList.toggle('hidden', state.analyticsTab !== 'links');
+    el.analyticsTabMailing.classList.toggle('hidden', state.analyticsTab !== 'mailing');
+  });
+
   // Keyboard shortcuts (Esc to close modals/lightbox, / to search)
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
@@ -1500,6 +2138,8 @@ function bindEvents() {
       closeModal('settingsModal');
       closeModal('feedbackModal');
       closeModal('inboxModal');
+      closeModal('privacyModal');
+      closeModal('analyticsModal');
     } else if (
       e.key === '/' &&
       state.user &&
