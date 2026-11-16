@@ -48,23 +48,43 @@ body {
   transition: background-color 0.25s ease, color 0.25s ease;
 }
 
-/* --- רקעים מונפשים עדינים לבחירת המשתמש --- */
+/* --- רקעים מונפשים נעימים ובולטים לבחירת המשתמש --- */
 .bg-ambient {
   position: fixed;
   inset: 0;
-  z-index: -1;
+  z-index: 0;
   pointer-events: none;
   overflow: hidden;
 }
 
+.app-layout,
+.auth-gate,
+.boot-loader {
+  position: relative;
+  z-index: 1;
+}
+
+/* 1. נקודות קלאסיות */
 body[data-bg="dots"] .bg-ambient {
-  background-image: radial-gradient(rgba(2, 132, 199, 0.12) 1.3px, transparent 1.3px);
+  background-image: radial-gradient(rgba(2, 132, 199, 0.16) 1.5px, transparent 1.5px);
   background-size: 22px 22px;
-  animation: bgDrift 45s linear infinite;
+  animation: bgDrift 40s linear infinite;
 }
 
 [data-theme="dark"] body[data-bg="dots"] .bg-ambient {
-  background-image: radial-gradient(rgba(56, 189, 248, 0.11) 1.3px, transparent 1.3px);
+  background-image: radial-gradient(rgba(56, 189, 248, 0.16) 1.5px, transparent 1.5px);
+}
+
+/* 2. בועות צפות חמודות */
+body[data-bg="bubbles"] .bg-ambient {
+  background-image:
+    radial-gradient(circle at 38% 24%, rgba(2, 132, 199, 0.16) 0, rgba(2, 132, 199, 0.08) 42px, rgba(2, 132, 199, 0.22) 44px, transparent 46px),
+    radial-gradient(circle at 62% 70%, rgba(99, 102, 241, 0.14) 0, rgba(99, 102, 241, 0.06) 54px, rgba(99, 102, 241, 0.2) 56px, transparent 58px),
+    radial-gradient(circle at 52% 45%, rgba(14, 165, 233, 0.15) 0, rgba(14, 165, 233, 0.07) 26px, rgba(14, 165, 233, 0.24) 28px, transparent 30px),
+    radial-gradient(circle at 32% 82%, rgba(56, 189, 248, 0.16) 0, rgba(56, 189, 248, 0.07) 32px, rgba(56, 189, 248, 0.22) 34px, transparent 36px),
+    radial-gradient(circle at 68% 18%, rgba(14, 165, 233, 0.14) 0, rgba(14, 165, 233, 0.05) 36px, rgba(14, 165, 233, 0.2) 38px, transparent 40px);
+  background-size: 100% 100%;
+  animation: bubblesBob 10s ease-in-out infinite alternate;
 }
 
 body[data-bg="bubbles"] .bg-ambient::before,
@@ -72,50 +92,59 @@ body[data-bg="bubbles"] .bg-ambient::after {
   content: "";
   position: absolute;
   border-radius: 50%;
-  filter: blur(55px);
-  opacity: 0.45;
-  animation: floatBubble 16s ease-in-out infinite alternate;
+  border: 1.5px solid rgba(2, 132, 199, 0.22);
+  background: radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.45), rgba(56, 189, 248, 0.12) 65%, transparent 100%);
+  animation: floatBubble 12s ease-in-out infinite alternate;
 }
 
 body[data-bg="bubbles"] .bg-ambient::before {
-  width: 380px;
-  height: 380px;
-  background: radial-gradient(circle, rgba(56, 189, 248, 0.45), transparent 70%);
-  top: -80px;
-  right: 8%;
+  width: 110px;
+  height: 110px;
+  top: 14%;
+  left: 34%;
 }
 
 body[data-bg="bubbles"] .bg-ambient::after {
-  width: 420px;
-  height: 420px;
-  background: radial-gradient(circle, rgba(99, 102, 241, 0.35), transparent 70%);
-  bottom: -100px;
-  left: 6%;
-  animation-delay: -6s;
+  width: 85px;
+  height: 85px;
+  bottom: 16%;
+  right: 33%;
+  animation-delay: -5s;
 }
 
+[data-theme="dark"] body[data-bg="bubbles"] .bg-ambient::before,
+[data-theme="dark"] body[data-bg="bubbles"] .bg-ambient::after {
+  border-color: rgba(56, 189, 248, 0.28);
+  background: radial-gradient(circle at 30% 30%, rgba(186, 230, 253, 0.22), rgba(56, 189, 248, 0.08) 65%, transparent 100%);
+}
+
+/* 3. נצנוץ כוכבים ברור ועדין */
 body[data-bg="stars"] .bg-ambient {
   background-image:
-    radial-gradient(2px 2px at 20px 30px, rgba(2, 132, 199, 0.26), transparent),
-    radial-gradient(2px 2px at 90px 140px, rgba(99, 102, 241, 0.24), transparent),
-    radial-gradient(1.5px 1.5px at 160px 80px, rgba(14, 165, 233, 0.28), transparent);
-  background-size: 200px 200px;
-  animation: twinkleShift 10s ease-in-out infinite alternate;
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160' viewBox='0 0 160 160'%3E%3Cpath d='M30 22l2 6 6 2-6 2-2 6-2-6-6-2 6-2z' fill='rgba(2,132,199,0.34)'/%3E%3Cpath d='M122 54l1.5 4.5 4.5 1.5-4.5 1.5-1.5 4.5-1.5-4.5-4.5-1.5 4.5-1.5z' fill='rgba(99,102,241,0.32)'/%3E%3Cpath d='M74 118l2.2 6.5 6.5 2.2-6.5 2.2-2.2 6.5-2.2-6.5-6.5-2.2 6.5-2.2z' fill='rgba(14,165,233,0.30)'/%3E%3Ccircle cx='140' cy='135' r='2' fill='rgba(2,132,199,0.28)'/%3E%3Ccircle cx='22' cy='96' r='1.8' fill='rgba(99,102,241,0.28)'/%3E%3C/svg%3E");
+  background-size: 160px 160px;
+  animation: twinkleShift 4.5s ease-in-out infinite alternate;
 }
 
 [data-theme="dark"] body[data-bg="stars"] .bg-ambient {
   background-image:
-    radial-gradient(2px 2px at 20px 30px, rgba(186, 230, 253, 0.36), transparent),
-    radial-gradient(2px 2px at 90px 140px, rgba(165, 180, 252, 0.3), transparent),
-    radial-gradient(1.5px 1.5px at 160px 80px, rgba(255, 255, 255, 0.3), transparent);
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160' viewBox='0 0 160 160'%3E%3Cpath d='M30 22l2 6 6 2-6 2-2 6-2-6-6-2 6-2z' fill='rgba(125,211,252,0.45)'/%3E%3Cpath d='M122 54l1.5 4.5 4.5 1.5-4.5 1.5-1.5 4.5-1.5-4.5-4.5-1.5 4.5-1.5z' fill='rgba(165,180,252,0.42)'/%3E%3Cpath d='M74 118l2.2 6.5 6.5 2.2-6.5 2.2-2.2 6.5-2.2-6.5-6.5-2.2 6.5-2.2z' fill='rgba(255,255,255,0.38)'/%3E%3Ccircle cx='140' cy='135' r='2' fill='rgba(125,211,252,0.4)'/%3E%3Ccircle cx='22' cy='96' r='1.8' fill='rgba(165,180,252,0.4)'/%3E%3C/svg%3E");
 }
 
+/* 4. גלים רגועים נעים */
 body[data-bg="waves"] .bg-ambient {
-  background: linear-gradient(125deg, rgba(2, 132, 199, 0.09) 0%, transparent 45%, rgba(99, 102, 241, 0.09) 100%);
-  background-size: 200% 200%;
-  animation: waveFlow 14s ease-in-out infinite alternate;
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='80' viewBox='0 0 240 80'%3E%3Cpath d='M0 40 Q 30 20 60 40 T 120 40 T 180 40 T 240 40' fill='none' stroke='rgba(2,132,199,0.20)' stroke-width='2'/%3E%3Cpath d='M0 62 Q 30 44 60 62 T 120 62 T 180 62 T 240 62' fill='none' stroke='rgba(99,102,241,0.14)' stroke-width='1.5'/%3E%3C/svg%3E");
+  background-size: 240px 80px;
+  animation: waveFlow 14s linear infinite;
 }
 
+[data-theme="dark"] body[data-bg="waves"] .bg-ambient {
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='80' viewBox='0 0 240 80'%3E%3Cpath d='M0 40 Q 30 20 60 40 T 120 40 T 180 40 T 240 40' fill='none' stroke='rgba(56,189,248,0.22)' stroke-width='2'/%3E%3Cpath d='M0 62 Q 30 44 60 62 T 120 62 T 180 62 T 240 62' fill='none' stroke='rgba(129,140,248,0.16)' stroke-width='1.5'/%3E%3C/svg%3E");
+}
+
+/* 5. נקי */
 body[data-bg="clean"] .bg-ambient {
   background: none;
 }
@@ -125,19 +154,24 @@ body[data-bg="clean"] .bg-ambient {
   to { background-position: 220px 220px; }
 }
 
+@keyframes bubblesBob {
+  0% { transform: translateY(0) scale(1); }
+  100% { transform: translateY(-14px) scale(1.03); }
+}
+
 @keyframes floatBubble {
   0% { transform: translate(0, 0) scale(1); }
-  100% { transform: translate(-35px, 45px) scale(1.12); }
+  100% { transform: translate(-24px, -32px) scale(1.1); }
 }
 
 @keyframes twinkleShift {
-  0% { opacity: 0.55; transform: translateY(0); }
-  100% { opacity: 1; transform: translateY(-10px); }
+  0% { opacity: 0.6; transform: translateY(0); }
+  100% { opacity: 1; transform: translateY(-8px); }
 }
 
 @keyframes waveFlow {
-  0% { background-position: 0% 50%; }
-  100% { background-position: 100% 50%; }
+  from { background-position: 0 0; }
+  to { background-position: 240px 0; }
 }
 
 @keyframes postEnter {
