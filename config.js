@@ -10,5 +10,6 @@ window.CHANNEL_CONFIG = {
   DEFAULT_TITLE: 'המקום',
   DEFAULT_DESCRIPTION: 'עדכונים, סרטונים ותוכן נקי ומאושר',
   CATEGORIES: ['כללי', 'עדכונים', 'סרטונים', 'מאמרים', 'קבצים'],
-  ALLOWED_REACTIONS: ['👍', '❤️', '🔥', '👏', '😮']
+  ALLOWED_REACTIONS: ['👍', '❤️', '🔥', '👏', '😮'],
+  ENABLE_GOOGLE_AUTH: false
 };

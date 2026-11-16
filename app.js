@@ -15,24 +15,30 @@ const state = {
   activeCategory: 'הכל',
   searchQuery: '',
   gateMode: 'signin',
-  signedUrlCache: {}
+  signedUrlCache: {},
+  reactedMap: {}
 };
 
 const DEMO_STORAGE_KEY = 'private_channel_demo_v1';
-const SCROLL_STORAGE_KEY = 'hamakom_scroll_y_v1';
+const SCROLL_STORAGE_KEY = 'hamakom_scroll_anchor_v2';
 const BG_STORAGE_KEY = 'hamakom_bg_choice';
+const REACTED_STORAGE_KEY = 'hamakom_reacted_v1';
 let hasRestoredInitialScroll = false;
 
 // --- DOM Elements ---
 const el = {
+  bootLoader: document.getElementById('bootLoader'),
+  toastContainer: document.getElementById('toastContainer'),
   channelTitle: document.getElementById('channelTitle'),
   channelDescription: document.getElementById('channelDescription'),
   channelAvatar: document.getElementById('channelAvatar'),
+  channelStats: document.getElementById('channelStats'),
   themeToggle: document.getElementById('themeToggle'),
   adminSettingsBtn: document.getElementById('adminSettingsBtn'),
   profileEmail: document.getElementById('profileEmail'),
   bgPicker: document.getElementById('bgPicker'),
   hoverSearchWrap: document.getElementById('hoverSearchWrap'),
+  resetFilterBtn: document.getElementById('resetFilterBtn'),
   authGate: document.getElementById('authGate'),
   gateChannelTitle: document.getElementById('gateChannelTitle'),
   gateDemoNotice: document.getElementById('gateDemoNotice'),
@@ -40,6 +46,7 @@ const el = {
   gateLoginForm: document.getElementById('gateLoginForm'),
   gateEmail: document.getElementById('gateEmail'),
   gatePassword: document.getElementById('gatePassword'),
+  toggleGatePassword: document.getElementById('toggleGatePassword'),
   gateSubmitBtn: document.getElementById('gateSubmitBtn'),
   gateOrDivider: document.getElementById('gateOrDivider'),
   gateGoogleBtn: document.getElementById('gateGoogleBtn'),
@@ -58,16 +65,6 @@ const el = {
   jumpToPinnedBtn: document.getElementById('jumpToPinnedBtn'),
   feedContainer: document.getElementById('feedContainer'),
 
-  // Modals
-  loginModal: document.getElementById('loginModal'),
-  loginForm: document.getElementById('loginForm'),
-  loginEmail: document.getElementById('loginEmail'),
-  loginPassword: document.getElementById('loginPassword'),
-  googleLoginBtn: document.getElementById('googleLoginBtn'),
-  demoLoginBtn: document.getElementById('demoLoginBtn'),
-  demoLoginNotice: document.getElementById('demoLoginNotice'),
-  loginError: document.getElementById('loginError'),
-
   postModal: document.getElementById('postModal'),
   postModalTitle: document.getElementById('postModalTitle'),
   postForm: document.getElementById('postForm'),
@@ -76,6 +73,9 @@ const el = {
   postPinned: document.getElementById('postPinned'),
   postContent: document.getElementById('postContent'),
   postMediaType: document.getElementById('postMediaType'),
+  mediaDropzone: document.getElementById('mediaDropzone'),
+  dropzoneText: document.getElementById('dropzoneText'),
+  mediaPreviewBox: document.getElementById('mediaPreviewBox'),
   mediaInputs: document.getElementById('mediaInputs'),
   postMediaFile: document.getElementById('postMediaFile'),
   postMediaUrl: document.getElementById('postMediaUrl'),
@@ -95,7 +95,8 @@ const el = {
   lightboxClose: document.getElementById('lightboxClose'),
   readMoreModal: document.getElementById('readMoreModal'),
   readMoreBody: document.getElementById('readMoreBody'),
-  scrollBottomBtn: document.getElementById('scrollBottomBtn')
+  scrollBottomBtn: document.getElementById('scrollBottomBtn'),
+  newMsgDot: document.getElementById('newMsgDot')
 };
 
 // --- Helpers ---
@@ -146,6 +147,26 @@ function formatDayLabel(iso) {
   return new Intl.DateTimeFormat('he-IL', { dateStyle: 'long' }).format(d);
 }
 
+function formatBytes(bytes) {
+  if (!bytes) return '';
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function showToast(message, type = 'info') {
+  if (!el.toastContainer) return;
+  const node = document.createElement('div');
+  node.className = `toast toast-${type}`;
+  node.textContent = message;
+  el.toastContainer.appendChild(node);
+  setTimeout(() => {
+    node.style.opacity = '0';
+    node.style.transition = 'opacity 0.2s ease';
+    setTimeout(() => node.remove(), 220);
+  }, 2600);
+}
+
 function openModal(id) {
   document.getElementById(id)?.classList.remove('hidden');
 }
@@ -166,7 +187,7 @@ const ICONS = {
   maximize: `<svg class="icon-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"/><path d="M9 21H3v-6"/><path d="M21 3l-7 7"/><path d="M3 21l7-7"/></svg>`
 };
 
-// --- Theme ---
+// --- Theme & Preferences ---
 function initTheme() {
   const saved = localStorage.getItem('channel_theme') || 'light';
   document.documentElement.setAttribute('data-theme', saved);
@@ -202,13 +223,27 @@ function initBgPicker() {
   });
 }
 
+function loadReactedMap() {
+  try {
+    state.reactedMap = JSON.parse(localStorage.getItem(REACTED_STORAGE_KEY) || '{}');
+  } catch {
+    state.reactedMap = {};
+  }
+}
+
+function saveReactedMap() {
+  localStorage.setItem(REACTED_STORAGE_KEY, JSON.stringify(state.reactedMap));
+}
+
 // --- Demo Data ---
 function loadDemoData() {
   const raw = localStorage.getItem(DEMO_STORAGE_KEY);
   if (raw) {
     try {
       const parsed = JSON.parse(raw);
-      state.posts = parsed.posts || [];
+      state.posts = (parsed.posts || []).sort(
+        (a, b) => new Date(a.created_at) - new Date(b.created_at)
+      );
       state.settings = parsed.settings || state.settings;
       return;
     } catch {
@@ -230,7 +265,7 @@ function loadDemoData() {
     },
     {
       id: 1,
-      content: 'ברוכים הבאים לערוץ המקום! 🎉\nהערוץ פועל כרגע במצב הדגמה מקומי. לאחר חיבור קובץ config.js ל-Supabase (חינמי ללא כרטיס אשראי), כל הפוסטים, התמונות והסרטונים יישמרו בענן ויתעדכנו בזמן אמת.',
+      content: 'ברוכים הבאים לערוץ המקום!\nהערוץ פועל כרגע במצב הדגמה מקומי. לאחר חיבור קובץ config.js ל-Supabase, כל הפוסטים, התמונות והסרטונים יישמרו בענן ויתעדכנו בזמן אמת.',
       media_type: 'none',
       media_url: '',
       media_name: '',
@@ -260,18 +295,28 @@ async function initSupabase() {
   const { data: sessionData } = await state.supabase.auth.getSession();
   await handleAuthChange(sessionData?.session || null);
 
-  state.supabase.auth.onAuthStateChange(async (_event, session) => {
+  state.supabase.auth.onAuthStateChange(async (event, session) => {
+    if (event === 'INITIAL_SESSION') return;
     await handleAuthChange(session);
   });
 
-  // Realtime updates
   state.supabase
     .channel('public:posts')
     .on(
       'postgres_changes',
       { event: '*', schema: 'public', table: 'posts' },
-      async () => {
-        await fetchLiveData();
+      async (payload) => {
+        const wasNearBottom = isNearFeedBottom();
+        await fetchLiveData({ skipInitialRestore: true });
+        if (payload.eventType === 'INSERT') {
+          if (wasNearBottom) {
+            scrollToFeedBottom(true);
+          } else {
+            el.newMsgDot.classList.remove('hidden');
+            el.scrollBottomBtn.classList.remove('hidden');
+            showToast('הודעה חדשה פורסמה בערוץ');
+          }
+        }
       }
     )
     .subscribe();
@@ -290,13 +335,16 @@ async function handleAuthChange(session) {
     state.isAdmin = Boolean(data);
   }
 
-  renderAuthUI();
   if (state.user) {
     await fetchLiveData();
   } else {
     state.posts = [];
+    hasRestoredInitialScroll = false;
     await fetchSettingsOnly();
   }
+
+  renderAuthUI();
+  el.bootLoader.classList.add('hidden');
 }
 
 async function fetchSettingsOnly() {
@@ -342,7 +390,7 @@ async function resolveMediaUrls(posts) {
   });
 }
 
-async function fetchLiveData() {
+async function fetchLiveData(opts = {}) {
   if (!state.supabase) return;
 
   await fetchSettingsOnly();
@@ -355,7 +403,11 @@ async function fetchLiveData() {
 
   if (postsRes.data) {
     state.posts = await resolveMediaUrls(postsRes.data);
-    renderFeed({ restoreScroll: !hasRestoredInitialScroll });
+    renderCategories();
+    renderStats();
+    renderFeed({
+      restoreScroll: !opts.skipInitialRestore && !hasRestoredInitialScroll
+    });
   }
 }
 
@@ -373,8 +425,19 @@ function renderHeader() {
   }
 }
 
+function renderStats() {
+  if (!el.channelStats) return;
+  const total = state.posts.length;
+  const mediaCount = state.posts.filter((p) => p.media_type && p.media_type !== 'none').length;
+  el.channelStats.innerHTML = `
+    <span><strong>${total}</strong> הודעות</span>
+    <span><strong>${mediaCount}</strong> קבצי מדיה</span>
+  `;
+}
+
 function renderAuthUI() {
   const isLoggedIn = Boolean(state.user);
+  const showGoogle = !state.isDemo && Boolean(CONFIG.ENABLE_GOOGLE_AUTH);
 
   el.authGate.classList.toggle('hidden', isLoggedIn);
   el.channelContent.classList.toggle('hidden', !isLoggedIn);
@@ -383,8 +446,8 @@ function renderAuthUI() {
   el.gateDemoBtn.classList.toggle('hidden', !state.isDemo);
   el.gateAuthTabs.classList.toggle('hidden', state.isDemo);
   el.gateLoginForm.classList.toggle('hidden', state.isDemo);
-  el.gateOrDivider.classList.toggle('hidden', state.isDemo);
-  el.gateGoogleBtn.classList.toggle('hidden', state.isDemo);
+  el.gateOrDivider.classList.toggle('hidden', !showGoogle);
+  el.gateGoogleBtn.classList.toggle('hidden', !showGoogle);
 
   if (el.profileEmail) {
     el.profileEmail.textContent = state.user?.email || '—';
@@ -405,9 +468,14 @@ function renderCategories() {
   el.categoryChips.innerHTML = '';
 
   categories.forEach((cat) => {
+    const count =
+      cat === 'הכל'
+        ? state.posts.length
+        : state.posts.filter((p) => p.category === cat).length;
+
     const btn = document.createElement('button');
     btn.className = `chip ${state.activeCategory === cat ? 'active' : ''}`;
-    btn.textContent = cat;
+    btn.innerHTML = `<span>${escapeHtml(cat)}</span><span class="chip-count">${count}</span>`;
     btn.addEventListener('click', () => {
       state.activeCategory = cat;
       renderCategories();
@@ -416,14 +484,18 @@ function renderCategories() {
     el.categoryChips.appendChild(btn);
   });
 
-  // Populate select inside postModal
+  if (el.resetFilterBtn) {
+    const isFiltered = state.activeCategory !== 'הכל' || Boolean(state.searchQuery.trim());
+    el.resetFilterBtn.classList.toggle('hidden', !isFiltered);
+  }
+
   el.postCategory.innerHTML = (CONFIG.CATEGORIES || ['כללי'])
     .map((c) => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`)
     .join('');
 }
 
 function renderPinnedBanner() {
-  const pinned = state.posts.find((p) => p.is_pinned);
+  const pinned = [...state.posts].reverse().find((p) => p.is_pinned);
   if (!pinned) {
     el.pinnedBanner.classList.add('hidden');
     return;
@@ -477,32 +549,83 @@ function renderMedia(post) {
   }
 }
 
+function isNearFeedBottom() {
+  return document.documentElement.scrollHeight - (window.scrollY + window.innerHeight) < 220;
+}
+
 function scrollToFeedBottom(smooth = false) {
+  el.newMsgDot?.classList.add('hidden');
   window.scrollTo({
     top: document.documentElement.scrollHeight,
     behavior: smooth ? 'smooth' : 'instant'
   });
 }
 
+function saveScrollAnchor() {
+  if (!state.user || !hasRestoredInitialScroll) return;
+  const cards = el.feedContainer.querySelectorAll('.post-card');
+  let anchorPostId = null;
+  let anchorOffset = 0;
+
+  for (const card of cards) {
+    const rect = card.getBoundingClientRect();
+    if (rect.bottom > 40) {
+      anchorPostId = card.id;
+      anchorOffset = Math.round(rect.top);
+      break;
+    }
+  }
+
+  localStorage.setItem(
+    SCROLL_STORAGE_KEY,
+    JSON.stringify({
+      postId: anchorPostId,
+      offset: anchorOffset,
+      scrollY: Math.round(window.scrollY)
+    })
+  );
+}
+
 function applyInitialScroll() {
   hasRestoredInitialScroll = true;
+
   if (window.location.hash.startsWith('#post-')) {
     const target = document.getElementById(window.location.hash.slice(1));
     if (target) {
       target.scrollIntoView({ behavior: 'instant', block: 'center' });
+      target.classList.add('highlight');
+      setTimeout(() => target.classList.remove('highlight'), 1800);
       return;
     }
   }
-  const savedY = localStorage.getItem(SCROLL_STORAGE_KEY);
-  if (savedY !== null && !Number.isNaN(Number(savedY))) {
-    window.scrollTo({ top: Number(savedY), behavior: 'instant' });
-  } else {
-    scrollToFeedBottom(false);
+
+  const raw = localStorage.getItem(SCROLL_STORAGE_KEY);
+  if (raw) {
+    try {
+      const saved = JSON.parse(raw);
+      if (saved.postId) {
+        const anchorEl = document.getElementById(saved.postId);
+        if (anchorEl) {
+          const top = anchorEl.getBoundingClientRect().top + window.scrollY - (saved.offset || 0);
+          window.scrollTo({ top: Math.max(0, top), behavior: 'instant' });
+          return;
+        }
+      }
+      if (typeof saved.scrollY === 'number') {
+        window.scrollTo({ top: saved.scrollY, behavior: 'instant' });
+        return;
+      }
+    } catch {
+      // ignore invalid saved scroll
+    }
   }
+
+  scrollToFeedBottom(false);
 }
 
 function renderFeed(options = {}) {
   renderPinnedBanner();
+  renderStats();
 
   const shouldRestore = Boolean(options.restoreScroll && !hasRestoredInitialScroll);
   if (shouldRestore) {
@@ -539,10 +662,12 @@ function renderFeed(options = {}) {
       }
 
       const reactions = post.reactions || {};
+      const userReactedList = state.reactedMap[post.id] || [];
       const reactionsHtml = allowedReactions
         .map((emoji) => {
           const count = reactions[emoji] || 0;
-          return `<button class="reaction-btn" data-react="${post.id}" data-emoji="${emoji}">${emoji} <span>${count}</span></button>`;
+          const activeClass = userReactedList.includes(emoji) ? 'is-reacted' : '';
+          return `<button class="reaction-btn ${activeClass}" data-react="${post.id}" data-emoji="${emoji}">${emoji} <span>${count}</span></button>`;
         })
         .join('');
 
@@ -561,6 +686,11 @@ function renderFeed(options = {}) {
            </div>`
         : '';
 
+      const isEdited =
+        post.updated_at &&
+        post.created_at &&
+        new Date(post.updated_at).getTime() - new Date(post.created_at).getTime() > 5000;
+
       return `
         ${dayDividerHtml}
         <article class="post-card" id="post-${post.id}">
@@ -569,6 +699,7 @@ function renderFeed(options = {}) {
               <span class="post-cat">${escapeHtml(post.category || 'כללי')}</span>
               ${post.is_pinned ? `<span class="post-pin-tag">${ICONS.pin}<span>נעוץ</span></span>` : ''}
               <time datetime="${escapeHtml(post.created_at)}">${formatDate(post.created_at)}</time>
+              ${isEdited ? '<span class="edited-tag">נערך</span>' : ''}
             </div>
             ${adminControls}
           </div>
@@ -583,7 +714,6 @@ function renderFeed(options = {}) {
     })
     .join('');
 
-  // Collapse long text blocks so no post exceeds viewport height
   el.feedContainer.querySelectorAll('[data-content-wrap]').forEach((wrap) => {
     const contentEl = wrap.querySelector('.post-content');
     const btn = wrap.querySelector('.read-more-btn');
@@ -597,14 +727,23 @@ function renderFeed(options = {}) {
     applyInitialScroll();
     el.feedContainer.style.visibility = 'visible';
   } else if (options.scrollToBottom && !window.location.hash.startsWith('#post-')) {
-    scrollToFeedBottom(false);
+    scrollToFeedBottom(true);
   }
 }
 
 // --- Actions ---
 async function handleReaction(postId, emoji) {
+  const key = String(postId);
+  state.reactedMap[key] = state.reactedMap[key] || [];
+  if (state.reactedMap[key].includes(emoji)) {
+    showToast('כבר הגבת עם אימוג׳י זה');
+    return;
+  }
+  state.reactedMap[key].push(emoji);
+  saveReactedMap();
+
   if (state.isDemo) {
-    const post = state.posts.find((p) => String(p.id) === String(postId));
+    const post = state.posts.find((p) => String(p.id) === key);
     if (!post) return;
     post.reactions = post.reactions || {};
     post.reactions[emoji] = (post.reactions[emoji] || 0) + 1;
@@ -618,7 +757,7 @@ async function handleReaction(postId, emoji) {
     p_emoji: emoji
   });
   if (!error && data) {
-    const post = state.posts.find((p) => String(p.id) === String(postId));
+    const post = state.posts.find((p) => String(p.id) === key);
     if (post) {
       post.reactions = data;
       renderFeed();
@@ -626,9 +765,40 @@ async function handleReaction(postId, emoji) {
   }
 }
 
+function updateMediaPreview(file = null) {
+  if (!el.mediaPreviewBox) return;
+  if (!file) {
+    el.mediaPreviewBox.classList.add('hidden');
+    el.mediaPreviewBox.innerHTML = '';
+    el.dropzoneText.textContent = 'גרור לכאן קובץ (תמונה, סרטון, שמע) או לחץ לבחירה';
+    return;
+  }
+
+  el.dropzoneText.textContent = `נבחר: ${file.name} (${formatBytes(file.size)})`;
+  const objectUrl = URL.createObjectURL(file);
+
+  if (file.type.startsWith('image/')) {
+    el.postMediaType.value = 'image';
+    el.mediaPreviewBox.innerHTML = `<img src="${objectUrl}" alt="תצוגה מקדימה" /><span class="media-preview-meta">${escapeHtml(file.name)} • ${formatBytes(file.size)}</span>`;
+  } else if (file.type.startsWith('video/')) {
+    el.postMediaType.value = 'video';
+    el.mediaPreviewBox.innerHTML = `<video src="${objectUrl}" controls muted></video><span class="media-preview-meta">${escapeHtml(file.name)} • ${formatBytes(file.size)}</span>`;
+  } else if (file.type.startsWith('audio/')) {
+    el.postMediaType.value = 'audio';
+    el.mediaPreviewBox.innerHTML = `<audio src="${objectUrl}" controls></audio><span class="media-preview-meta">${escapeHtml(file.name)} • ${formatBytes(file.size)}</span>`;
+  } else {
+    el.postMediaType.value = 'file';
+    el.mediaPreviewBox.innerHTML = `<span class="media-preview-meta">📎 ${escapeHtml(file.name)} • ${formatBytes(file.size)}</span>`;
+  }
+
+  el.mediaInputs.classList.remove('hidden');
+  el.mediaPreviewBox.classList.remove('hidden');
+}
+
 function openPostModal(post = null) {
   el.postFormError.classList.add('hidden');
   el.postMediaFile.value = '';
+  updateMediaPreview(null);
 
   if (post) {
     el.postModalTitle.textContent = 'עריכת פוסט';
@@ -650,7 +820,8 @@ function openPostModal(post = null) {
     el.postMediaName.value = '';
   }
 
-  el.mediaInputs.classList.toggle('hidden', el.postMediaType.value === 'none');
+  const showMediaFields = el.postMediaType.value !== 'none';
+  el.mediaInputs.classList.toggle('hidden', !showMediaFields);
   openModal('postModal');
 }
 
@@ -658,7 +829,7 @@ async function savePost(e) {
   e.preventDefault();
   el.postFormError.classList.add('hidden');
   el.savePostBtn.disabled = true;
-  el.savePostBtn.textContent = 'שומר...';
+  el.savePostBtn.textContent = 'מעלה ושומר...';
 
   try {
     const id = el.editPostId.value;
@@ -690,7 +861,8 @@ async function savePost(e) {
       is_pinned: el.postPinned.checked,
       media_type: mediaType,
       media_url: mediaType === 'none' ? '' : mediaUrl,
-      media_name: mediaType === 'none' ? '' : mediaName
+      media_name: mediaType === 'none' ? '' : mediaName,
+      updated_at: new Date().toISOString()
     };
 
     if (!payload.content && !payload.media_url) {
@@ -710,6 +882,7 @@ async function savePost(e) {
         });
       }
       saveDemoData();
+      renderCategories();
       renderFeed({ scrollToBottom: !id });
     } else {
       if (id) {
@@ -719,10 +892,12 @@ async function savePost(e) {
         const { error } = await state.supabase.from('posts').insert(payload);
         if (error) throw error;
       }
-      await fetchLiveData();
+      await fetchLiveData({ skipInitialRestore: true });
+      if (!id) scrollToFeedBottom(true);
     }
 
     closeModal('postModal');
+    showToast(id ? 'הפוסט עודכן בהצלחה' : 'הפוסט פורסם בערוץ!', 'success');
   } catch (err) {
     el.postFormError.textContent = err.message || 'שגיאה בשמירת הפוסט';
     el.postFormError.classList.remove('hidden');
@@ -738,28 +913,49 @@ async function deletePost(postId) {
   if (state.isDemo) {
     state.posts = state.posts.filter((p) => String(p.id) !== String(postId));
     saveDemoData();
+    renderCategories();
     renderFeed();
+    showToast('הפוסט נמחק');
     return;
   }
 
   const { error } = await state.supabase.from('posts').delete().eq('id', postId);
-  if (!error) await fetchLiveData();
+  if (!error) {
+    await fetchLiveData({ skipInitialRestore: true });
+    showToast('הפוסט נמחק');
+  } else {
+    showToast('שגיאה במחיקת הפוסט', 'error');
+  }
 }
 
 // --- Event Listeners ---
 function bindEvents() {
-  // Close modals
   document.querySelectorAll('[data-close]').forEach((node) => {
     node.addEventListener('click', () => closeModal(node.getAttribute('data-close')));
   });
 
-  // Search
+  // Search + Reset filter
   el.searchInput.addEventListener('input', (e) => {
     state.searchQuery = e.target.value;
+    renderCategories();
     renderFeed();
   });
 
-  // Gate Tabs (signin / signup)
+  el.resetFilterBtn?.addEventListener('click', () => {
+    state.activeCategory = 'הכל';
+    state.searchQuery = '';
+    el.searchInput.value = '';
+    renderCategories();
+    renderFeed();
+  });
+
+  // Password show/hide toggle
+  el.toggleGatePassword?.addEventListener('click', () => {
+    const isPass = el.gatePassword.type === 'password';
+    el.gatePassword.type = isPass ? 'text' : 'password';
+  });
+
+  // Gate Tabs
   el.gateAuthTabs.addEventListener('click', (e) => {
     const tab = e.target.closest('[data-auth-tab]');
     if (!tab) return;
@@ -767,38 +963,46 @@ function bindEvents() {
     el.gateAuthTabs.querySelectorAll('.auth-tab').forEach((t) => t.classList.remove('active'));
     tab.classList.add('active');
     el.gateSubmitBtn.textContent = state.gateMode === 'signup' ? 'הרשמה לערוץ' : 'התחבר לערוץ';
+    el.gatePassword.autocomplete = state.gateMode === 'signup' ? 'new-password' : 'current-password';
     el.gateError.classList.add('hidden');
     el.gateSuccess.classList.add('hidden');
   });
 
-  // Gate Login / Signup Form
+  // Gate Login / Signup
   el.gateLoginForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     el.gateError.classList.add('hidden');
     el.gateSuccess.classList.add('hidden');
-    const email = el.gateEmail.value.trim();
-    const password = el.gatePassword.value;
+    el.gateSubmitBtn.disabled = true;
 
-    if (state.gateMode === 'signup') {
-      const { data, error } = await state.supabase.auth.signUp({ email, password });
-      if (error) {
-        el.gateError.textContent = error.message;
-        el.gateError.classList.remove('hidden');
-      } else if (data.session) {
-        await handleAuthChange(data.session);
-      } else {
-        el.gateSuccess.textContent = 'נשלח אליך מייל אימות! אשר את הכתובת כדי להיכנס לערוץ.';
-        el.gateSuccess.classList.remove('hidden');
+    try {
+      const email = el.gateEmail.value.trim();
+      const password = el.gatePassword.value;
+
+      if (state.gateMode === 'signup') {
+        const { data, error } = await state.supabase.auth.signUp({ email, password });
+        if (error) {
+          el.gateError.textContent = error.message;
+          el.gateError.classList.remove('hidden');
+        } else if (data.session) {
+          await handleAuthChange(data.session);
+          showToast('נרשמת והתחברת בהצלחה!', 'success');
+        } else {
+          el.gateSuccess.textContent = 'נשלח אליך מייל אימות! אשר את הכתובת כדי להיכנס לערוץ.';
+          el.gateSuccess.classList.remove('hidden');
+        }
+        return;
       }
-      return;
-    }
 
-    const { data, error } = await state.supabase.auth.signInWithPassword({ email, password });
-    if (error) {
-      el.gateError.textContent = error.message;
-      el.gateError.classList.remove('hidden');
-    } else {
-      await handleAuthChange(data.session);
+      const { data, error } = await state.supabase.auth.signInWithPassword({ email, password });
+      if (error) {
+        el.gateError.textContent = 'אימייל או סיסמה שגויים.';
+        el.gateError.classList.remove('hidden');
+      } else {
+        await handleAuthChange(data.session);
+      }
+    } finally {
+      el.gateSubmitBtn.disabled = false;
     }
   });
 
@@ -814,7 +1018,7 @@ function bindEvents() {
     }
   });
 
-  // Hover/tap search toggle for touch devices
+  // Hover/tap search toggle
   if (el.hoverSearchWrap) {
     const trigger = el.hoverSearchWrap.querySelector('.hover-search-trigger');
     trigger?.addEventListener('click', () => {
@@ -835,26 +1039,57 @@ function bindEvents() {
     state.user = { email: 'demo@admin.local' };
     state.isAdmin = true;
     renderAuthUI();
+    renderCategories();
     renderFeed({ restoreScroll: !hasRestoredInitialScroll });
   });
 
-  // Logout (All users)
+  // Logout
   el.logoutBtn.addEventListener('click', async () => {
+    hasRestoredInitialScroll = false;
     if (state.isDemo) {
       state.user = null;
       state.isAdmin = false;
       renderAuthUI();
-      renderFeed();
       return;
     }
     await state.supabase.auth.signOut();
+    showToast('התנתקת מהערוץ');
   });
 
-  // New / Edit Post
+  // New / Edit Post & Drag-and-Drop Media
   el.newPostBtn.addEventListener('click', () => openPostModal());
   el.postMediaType.addEventListener('change', () => {
-    el.mediaInputs.classList.toggle('hidden', el.postMediaType.value === 'none');
+    const show = el.postMediaType.value !== 'none';
+    el.mediaInputs.classList.toggle('hidden', !show);
   });
+
+  el.postMediaFile.addEventListener('change', () => {
+    updateMediaPreview(el.postMediaFile.files[0] || null);
+  });
+
+  ['dragenter', 'dragover'].forEach((evt) => {
+    el.mediaDropzone.addEventListener(evt, (e) => {
+      e.preventDefault();
+      el.mediaDropzone.classList.add('is-dragover');
+    });
+  });
+
+  ['dragleave', 'drop'].forEach((evt) => {
+    el.mediaDropzone.addEventListener(evt, (e) => {
+      e.preventDefault();
+      el.mediaDropzone.classList.remove('is-dragover');
+    });
+  });
+
+  el.mediaDropzone.addEventListener('drop', (e) => {
+    const file = e.dataTransfer?.files?.[0];
+    if (!file) return;
+    const dt = new DataTransfer();
+    dt.items.add(file);
+    el.postMediaFile.files = dt.files;
+    updateMediaPreview(file);
+  });
+
   el.postForm.addEventListener('submit', savePost);
 
   // Settings
@@ -887,9 +1122,10 @@ function bindEvents() {
       }
     }
     closeModal('settingsModal');
+    showToast('הגדרות הערוץ נשמרו', 'success');
   });
 
-  // Feed delegation (reactions, edit, delete, share, read more, fullscreen media)
+  // Feed Delegation
   el.feedContainer.addEventListener('click', (e) => {
     const reactBtn = e.target.closest('[data-react]');
     if (reactBtn) {
@@ -915,6 +1151,7 @@ function bindEvents() {
       const url = `${window.location.origin}${window.location.pathname}#post-${shareBtn.dataset.share}`;
       navigator.clipboard?.writeText(url);
       shareBtn.innerHTML = `${ICONS.check}<span>הועתק!</span>`;
+      showToast('הקישור להודעה הועתק');
       setTimeout(() => (shareBtn.innerHTML = `${ICONS.link}<span>העתק קישור</span>`), 1500);
       return;
     }
@@ -947,7 +1184,6 @@ function bindEvents() {
     }
   });
 
-  // Lightbox close
   function closeLightbox() {
     el.lightbox.classList.add('hidden');
     el.lightboxVideo.pause();
@@ -960,19 +1196,35 @@ function bindEvents() {
     if (e.target === el.lightbox) closeLightbox();
   });
 
-  // Floating scroll-to-bottom button & persistent scroll position
+  // Keyboard shortcuts (Esc to close modals/lightbox, / to search)
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      if (!el.lightbox.classList.contains('hidden')) closeLightbox();
+      closeModal('postModal');
+      closeModal('settingsModal');
+      closeModal('readMoreModal');
+    } else if (
+      e.key === '/' &&
+      state.user &&
+      !['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)
+    ) {
+      e.preventDefault();
+      el.hoverSearchWrap?.classList.add('is-open');
+      el.searchInput.focus();
+    }
+  });
+
+  // Scroll bottom & persistent anchor position
   el.scrollBottomBtn.addEventListener('click', () => scrollToFeedBottom(true));
   let scrollSaveTimer = null;
   window.addEventListener('scroll', () => {
     if (!state.user || !hasRestoredInitialScroll) return;
-    const distanceFromBottom =
-      document.documentElement.scrollHeight - (window.scrollY + window.innerHeight);
-    el.scrollBottomBtn.classList.toggle('hidden', distanceFromBottom < 220);
+    const nearBottom = isNearFeedBottom();
+    el.scrollBottomBtn.classList.toggle('hidden', nearBottom);
+    if (nearBottom) el.newMsgDot.classList.add('hidden');
 
     clearTimeout(scrollSaveTimer);
-    scrollSaveTimer = setTimeout(() => {
-      localStorage.setItem(SCROLL_STORAGE_KEY, String(Math.round(window.scrollY)));
-    }, 150);
+    scrollSaveTimer = setTimeout(saveScrollAnchor, 120);
   });
 }
 
@@ -980,19 +1232,20 @@ function bindEvents() {
 async function init() {
   initTheme();
   initBgPicker();
+  loadReactedMap();
   renderCategories();
   bindEvents();
 
   if (state.isDemo) {
     loadDemoData();
     renderHeader();
+    renderCategories();
     renderAuthUI();
+    el.bootLoader.classList.add('hidden');
     if (state.user) renderFeed({ restoreScroll: true });
   } else {
     renderHeader();
-    renderAuthUI();
     await initSupabase();
-    await fetchLiveData();
   }
 }
 

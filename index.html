@@ -14,8 +14,17 @@
   <!-- שכבת רקע מונפשת עדינה -->
   <div class="bg-ambient" aria-hidden="true"></div>
 
+  <!-- מערכת התראות (Toast) -->
+  <div id="toastContainer" class="toast-container" aria-live="polite"></div>
+
+  <!-- מסך טעינה ראשוני (מונע הבהוב של מסך כניסה בזמן אימות סשן) -->
+  <div id="bootLoader" class="boot-loader">
+    <div class="boot-spinner"></div>
+    <span>טוען את ערוץ המקום...</span>
+  </div>
+
   <!-- מסך שער חובה (מוצג לפני התחברות) -->
-  <section id="authGate" class="auth-gate">
+  <section id="authGate" class="auth-gate hidden">
     <div class="auth-gate-card">
       <div class="auth-gate-icon">
         <svg class="icon-lg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
@@ -35,18 +44,22 @@
       <form id="gateLoginForm" class="stack-form">
         <label>
           אימייל
-          <input type="email" id="gateEmail" placeholder="name@gmail.com" required />
+          <input type="email" id="gateEmail" placeholder="name@gmail.com" autocomplete="email" required />
         </label>
         <label>
           סיסמה
-          <input type="password" id="gatePassword" placeholder="••••••••" minlength="6" required />
+          <div class="password-field">
+            <input type="password" id="gatePassword" placeholder="לפחות 6 תווים" minlength="6" autocomplete="current-password" required />
+            <button type="button" id="toggleGatePassword" class="password-toggle" aria-label="הצג או הסתר סיסמה">
+              <svg class="icon-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+            </button>
+          </div>
         </label>
         <button type="submit" id="gateSubmitBtn" class="btn btn-primary btn-full">התחבר לערוץ</button>
       </form>
 
-      <div id="gateOrDivider" class="divider"><span>או</span></div>
-
-      <button id="gateGoogleBtn" class="btn btn-outline btn-full">המשך עם חשבון Google</button>
+      <div id="gateOrDivider" class="divider hidden"><span>או</span></div>
+      <button id="gateGoogleBtn" class="btn btn-outline btn-full hidden">המשך עם חשבון Google</button>
       <button id="gateDemoBtn" class="btn btn-primary btn-full hidden">כניסה למצב הדגמה</button>
 
       <p id="gateError" class="error-text hidden"></p>
@@ -67,7 +80,7 @@
           </div>
           <!-- אייקון חיפוש שנפתח לתיבת חיפוש בריחוף עכבר -->
           <div class="hover-search" id="hoverSearchWrap">
-            <button type="button" class="icon-btn hover-search-trigger" title="חיפוש בערוץ" aria-label="חיפוש בערוץ">
+            <button type="button" class="icon-btn hover-search-trigger" title="חיפוש בערוץ (/)" aria-label="חיפוש בערוץ">
               <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
             </button>
             <div class="hover-search-drawer">
@@ -75,10 +88,14 @@
             </div>
           </div>
         </div>
+        <div class="channel-stats" id="channelStats"></div>
       </div>
 
       <div class="sidebar-card categories-card">
-        <div class="sidebar-section-title">קטגוריות</div>
+        <div class="sidebar-section-header">
+          <span class="sidebar-section-title">קטגוריות</span>
+          <button type="button" id="resetFilterBtn" class="reset-filter-btn hidden">נקה סינון</button>
+        </div>
         <div class="category-chips" id="categoryChips" role="tablist" aria-label="סינון לפי קטגוריה"></div>
       </div>
     </aside>
@@ -88,7 +105,8 @@
       <!-- סרגל מנהל -->
       <section id="adminBar" class="admin-bar hidden">
         <div class="admin-bar-info">
-          <span>מנהל: <strong id="adminEmailDisplay"></strong></span>
+          <span class="admin-badge-pill">ניהול</span>
+          <strong id="adminEmailDisplay"></strong>
         </div>
         <div class="admin-bar-actions">
           <button id="newPostBtn" class="btn btn-primary btn-with-icon">
@@ -116,6 +134,7 @@
       <!-- כפתור חץ צמוד לפיד לגלילה להודעה האחרונה -->
       <div class="scroll-bottom-anchor">
         <button id="scrollBottomBtn" class="scroll-bottom-btn hidden" title="קפוץ להודעה האחרונה" aria-label="קפוץ להודעה האחרונה">
+          <span id="newMsgDot" class="new-msg-dot hidden">חדש</span>
           <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
         </button>
       </div>
@@ -215,11 +234,15 @@
             </select>
           </label>
 
+          <div id="mediaDropzone" class="dropzone">
+            <input type="file" id="postMediaFile" class="dropzone-input" />
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>
+            <span id="dropzoneText">גרור לכאן קובץ (תמונה, סרטון, שמע) או לחץ לבחירה</span>
+          </div>
+
+          <div id="mediaPreviewBox" class="media-preview-box hidden"></div>
+
           <div id="mediaInputs" class="stack-form hidden">
-            <label>
-              העלאת קובץ ישירות מהמחשב (אל Storage)
-              <input type="file" id="postMediaFile" />
-            </label>
             <label>
               או קישור ישיר למדיה (URL)
               <input type="url" id="postMediaUrl" placeholder="https://..." />
