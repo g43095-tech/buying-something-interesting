@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>הערוץ שלי</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <!-- סרגל עליון -->
+    <header class="channel-header">
+      <div class="header-main">
+        <div class="channel-avatar" id="channelAvatar" aria-hidden="true">ע</div>
+        <div class="channel-meta">
+          <div class="channel-title-row">
+            <h1 id="channelTitle">הערוץ שלי</h1>
+            <span class="badge-live" id="modeBadge" title="סטטוס חיבור">מצב הדגמה</span>
+          </div>
+          <p id="channelDescription" class="channel-desc">עדכונים, סרטונים ותוכן נקי ומאושר</p>
+        </div>
+      </div>
+
+      <div class="header-actions">
+        <button id="themeToggle" class="icon-btn" title="החלף מצב תצוגה (בהיר/כהה)" aria-label="החלף מצב תצוגה">🌙</button>
+        <button id="adminSettingsBtn" class="icon-btn hidden" title="הגדרות ערוץ" aria-label="הגדרות ערוץ">⚙️</button>
+        <button id="authBtn" class="btn btn-outline">כניסת מנהל</button>
+      </div>
+    </header>
+
+    <!-- הודעת מנהל / יצירת פוסט חדש (גלוי רק למנהל מחובר) -->
+    <section id="adminBar" class="admin-bar hidden">
+      <div class="admin-bar-info">
+        <span>מחובר כמנהל: <strong id="adminEmailDisplay"></strong></span>
+      </div>
+      <div class="admin-bar-actions">
+        <button id="newPostBtn" class="btn btn-primary">+ פוסט חדש</button>
+        <button id="logoutBtn" class="btn btn-ghost">התנתק</button>
+      </div>
+    </section>
+
+    <!-- סרגל חיפוש וסינון קטגוריות -->
+    <section class="toolbar">
+      <div class="search-box">
+        <span class="search-icon">🔍</span>
+        <input type="search" id="searchInput" placeholder="חיפוש בערוץ..." aria-label="חיפוש בערוץ" />
+      </div>
+      <div class="category-chips" id="categoryChips" role="tablist" aria-label="סינון לפי קטגוריה"></div>
+    </section>
+
+    <!-- הודעה נעוצה -->
+    <section id="pinnedBanner" class="pinned-banner hidden">
+      <div class="pinned-label">📌 הודעה נעוצה</div>
+      <div class="pinned-text" id="pinnedText"></div>
+      <button id="jumpToPinnedBtn" class="pinned-jump">עבור להודעה</button>
+    </section>
+
+    <!-- פיד הפוסטים -->
+    <main class="feed-container" id="feedContainer">
+      <div class="loading-state" id="loadingState">טוען עדכונים...</div>
+    </main>
+  </div>
+
+  <!-- מודאל התחברות מנהל -->
+  <div id="loginModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="loginModalTitle">
+    <div class="modal-backdrop" data-close="loginModal"></div>
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2 id="loginModalTitle">כניסת מנהל</h2>
+        <button class="icon-btn" data-close="loginModal" aria-label="סגור">✕</button>
+      </div>
+      <div class="modal-body">
+        <div id="demoLoginNotice" class="info-box hidden">
+          האתר פועל כרגע ב<strong>מצב הדגמה מקומי</strong> (ללא Supabase). לחיצה על "כניסה להדגמה" תאפשר לך לנסות פרסום, עריכה ונעיצת פוסטים בדפדפן.
+        </div>
+
+        <form id="loginForm" class="stack-form">
+          <label>
+            אימייל
+            <input type="email" id="loginEmail" placeholder="name@gmail.com" required />
+          </label>
+          <label>
+            סיסמה
+            <input type="password" id="loginPassword" placeholder="••••••••" required />
+          </label>
+          <button type="submit" class="btn btn-primary btn-full">התחבר עם אימייל וסיסמה</button>
+        </form>
+
+        <div class="divider"><span>או</span></div>
+
+        <button id="googleLoginBtn" class="btn btn-outline btn-full">התחבר עם חשבון Google</button>
+        <button id="demoLoginBtn" class="btn btn-primary btn-full hidden">כניסה למצב הדגמה (מנהל)</button>
+        <p id="loginError" class="error-text hidden"></p>
+      </div>
+    </div>
+  </div>
+
+  <!-- מודאל יצירה / עריכה של פוסט -->
+  <div id="postModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="postModalTitle">
+    <div class="modal-backdrop" data-close="postModal"></div>
+    <div class="modal-card modal-lg">
+      <div class="modal-header">
+        <h2 id="postModalTitle">פוסט חדש</h2>
+        <button class="icon-btn" data-close="postModal" aria-label="סגור">✕</button>
+      </div>
+      <form id="postForm" class="modal-body stack-form">
+        <input type="hidden" id="editPostId" />
+
+        <div class="form-row">
+          <label>
+            קטגוריה
+            <select id="postCategory"></select>
+          </label>
+          <label class="checkbox-label">
+            <input type="checkbox" id="postPinned" />
+            <span>נעץ הודעה בראש הערוץ</span>
+          </label>
+        </div>
+
+        <label>
+          תוכן ההודעה
+          <textarea id="postContent" rows="5" placeholder="כתוב כאן את העדכון... (אפשר להדביק גם קישורים)"></textarea>
+        </label>
+
+        <div class="media-box">
+          <label>
+            סוג מדיה
+            <select id="postMediaType">
+              <option value="none">ללא מדיה (טקסט בלבד)</option>
+              <option value="image">תמונה</option>
+              <option value="video">סרטון וידאו</option>
+              <option value="audio">הקלטה / אודיו</option>
+              <option value="file">קובץ להורדה</option>
+            </select>
+          </label>
+
+          <div id="mediaInputs" class="stack-form hidden">
+            <label>
+              העלאת קובץ ישירות מהמחשב (אל Storage)
+              <input type="file" id="postMediaFile" />
+            </label>
+            <label>
+              או קישור ישיר למדיה (URL)
+              <input type="url" id="postMediaUrl" placeholder="https://..." />
+            </label>
+            <label>
+              שם הקובץ / תיאור (אופציונלי)
+              <input type="text" id="postMediaName" placeholder="לדוגמה: מצגת שיעור.pdf" />
+            </label>
+          </div>
+        </div>
+
+        <p id="postFormError" class="error-text hidden"></p>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-ghost" data-close="postModal">ביטול</button>
+          <button type="submit" id="savePostBtn" class="btn btn-primary">פרסם בערוץ</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- מודאל הגדרות ערוץ -->
+  <div id="settingsModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="settingsModalTitle">
+    <div class="modal-backdrop" data-close="settingsModal"></div>
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2 id="settingsModalTitle">הגדרות ערוץ</h2>
+        <button class="icon-btn" data-close="settingsModal" aria-label="סגור">✕</button>
+      </div>
+      <form id="settingsForm" class="modal-body stack-form">
+        <label>
+          שם הערוץ
+          <input type="text" id="settingsTitle" required />
+        </label>
+        <label>
+          תיאור הערוץ
+          <textarea id="settingsDesc" rows="3"></textarea>
+        </label>
+        <label>
+          קישור לתמונת פרופיל / לוגו (אופציונלי)
+          <input type="url" id="settingsAvatar" placeholder="https://..." />
+        </label>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-ghost" data-close="settingsModal">ביטול</button>
+          <button type="submit" class="btn btn-primary">שמור שינויים</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- תצוגת תמונה מוגדלת (Lightbox) -->
+  <div id="lightbox" class="lightbox hidden" role="dialog" aria-modal="true">
+    <button class="lightbox-close" id="lightboxClose" aria-label="סגור תמונה">✕</button>
+    <img id="lightboxImg" src="" alt="תמונה מוגדלת" />
+  </div>
+
+  <script src="config.js"></script>
+  <script type="module" src="app.js"></script>
+</body>
+</html>
