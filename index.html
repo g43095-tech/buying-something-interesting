@@ -109,6 +109,11 @@
           <strong id="adminEmailDisplay"></strong>
         </div>
         <div class="admin-bar-actions">
+          <button id="openInboxBtn" class="btn btn-outline btn-with-icon" title="תיבת הודעות משוב">
+            <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>
+            <span>משובים</span>
+            <span id="inboxUnreadCount" class="unread-count-pill hidden">0</span>
+          </button>
           <button id="newPostBtn" class="btn btn-primary btn-with-icon">
             <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
             <span>פוסט חדש</span>
@@ -134,7 +139,7 @@
       <!-- כפתור חץ צמוד לפיד לגלילה להודעה האחרונה -->
       <div class="scroll-bottom-anchor">
         <button id="scrollBottomBtn" class="scroll-bottom-btn hidden" title="קפוץ להודעה האחרונה" aria-label="קפוץ להודעה האחרונה">
-          <span id="newMsgDot" class="new-msg-dot hidden">חדש</span>
+          <span id="newMsgDot" class="new-msg-dot hidden" aria-hidden="true"></span>
           <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
         </button>
       </div>
@@ -154,6 +159,9 @@
             </div>
           </div>
           <div class="profile-quick-actions">
+            <button id="notifyToggle" class="icon-btn" title="התראות דפדפן על הודעות חדשות" aria-label="הפעל או כבה התראות דפדפן">
+              <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+            </button>
             <button id="themeToggle" class="icon-btn" title="החלף מצב תצוגה (בהיר/כהה)" aria-label="החלף מצב תצוגה">
               <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
             </button>
@@ -175,10 +183,17 @@
           </div>
         </div>
 
-        <button id="logoutBtn" class="btn btn-outline btn-full btn-with-icon profile-logout-btn">
-          <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg>
-          <span>התנתק מהערוץ</span>
-        </button>
+        <div class="profile-actions-stack">
+          <button id="sendFeedbackBtn" class="btn btn-outline btn-full btn-with-icon">
+            <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+            <span>שלח משוב למנהל</span>
+          </button>
+
+          <button id="logoutBtn" class="btn btn-outline btn-full btn-with-icon">
+            <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg>
+            <span>התנתק מהערוץ</span>
+          </button>
+        </div>
       </div>
 
       <!-- אזור ייעודי למודעת פרסומת -->
@@ -295,18 +310,43 @@
     </div>
   </div>
 
-  <!-- מודאל קריאה מלאה לטקסט ארוך -->
-  <div id="readMoreModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="readMoreTitle">
-    <div class="modal-backdrop" data-close="readMoreModal"></div>
+  <!-- מודאל שליחת משוב למנהל (חד-כיווני) -->
+  <div id="feedbackModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="feedbackModalTitle">
+    <div class="modal-backdrop" data-close="feedbackModal"></div>
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2 id="feedbackModalTitle">שליחת משוב למנהלי הערוץ</h2>
+        <button class="icon-btn" data-close="feedbackModal" aria-label="סגור">
+          <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+        </button>
+      </div>
+      <form id="feedbackForm" class="modal-body stack-form">
+        <p class="modal-hint">הודעתך תישלח ישירות לתיבת ההודעות של מנהלי הערוץ.</p>
+        <label>
+          תוכן ההודעה / המשוב
+          <textarea id="feedbackInput" rows="4" maxlength="1000" placeholder="כתוב כאן הצעה, הערה או דיווח..." required></textarea>
+        </label>
+        <p id="feedbackError" class="error-text hidden"></p>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-ghost" data-close="feedbackModal">ביטול</button>
+          <button type="submit" id="sendFeedbackSubmit" class="btn btn-primary">שלח משוב</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- מודאל תיבת הודעות משוב למנהל -->
+  <div id="inboxModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="inboxModalTitle">
+    <div class="modal-backdrop" data-close="inboxModal"></div>
     <div class="modal-card modal-lg">
       <div class="modal-header">
-        <h2 id="readMoreTitle">תוכן ההודעה המלא</h2>
-        <button class="icon-btn" data-close="readMoreModal" aria-label="סגור">
+        <h2 id="inboxModalTitle">תיבת הודעות משוב</h2>
+        <button class="icon-btn" data-close="inboxModal" aria-label="סגור">
           <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
         </button>
       </div>
       <div class="modal-body">
-        <div id="readMoreBody" class="post-content"></div>
+        <div id="inboxList" class="inbox-list"></div>
       </div>
     </div>
   </div>

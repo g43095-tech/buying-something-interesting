@@ -16,13 +16,17 @@ const state = {
   searchQuery: '',
   gateMode: 'signin',
   signedUrlCache: {},
-  reactedMap: {}
+  reactedMap: {},
+  feedbacks: [],
+  notificationsEnabled: false
 };
 
 const DEMO_STORAGE_KEY = 'private_channel_demo_v1';
+const DEMO_FEEDBACK_KEY = 'hamakom_demo_feedback_v1';
 const SCROLL_STORAGE_KEY = 'hamakom_scroll_anchor_v2';
 const BG_STORAGE_KEY = 'hamakom_bg_choice';
 const REACTED_STORAGE_KEY = 'hamakom_reacted_v1';
+const NOTIFY_STORAGE_KEY = 'hamakom_browser_notify';
 let hasRestoredInitialScroll = false;
 
 // --- DOM Elements ---
@@ -33,10 +37,12 @@ const el = {
   channelDescription: document.getElementById('channelDescription'),
   channelAvatar: document.getElementById('channelAvatar'),
   channelStats: document.getElementById('channelStats'),
+  notifyToggle: document.getElementById('notifyToggle'),
   themeToggle: document.getElementById('themeToggle'),
   adminSettingsBtn: document.getElementById('adminSettingsBtn'),
   profileEmail: document.getElementById('profileEmail'),
   bgPicker: document.getElementById('bgPicker'),
+  sendFeedbackBtn: document.getElementById('sendFeedbackBtn'),
   hoverSearchWrap: document.getElementById('hoverSearchWrap'),
   resetFilterBtn: document.getElementById('resetFilterBtn'),
   authGate: document.getElementById('authGate'),
@@ -56,6 +62,8 @@ const el = {
   channelContent: document.getElementById('channelContent'),
   adminBar: document.getElementById('adminBar'),
   adminEmailDisplay: document.getElementById('adminEmailDisplay'),
+  openInboxBtn: document.getElementById('openInboxBtn'),
+  inboxUnreadCount: document.getElementById('inboxUnreadCount'),
   newPostBtn: document.getElementById('newPostBtn'),
   logoutBtn: document.getElementById('logoutBtn'),
   searchInput: document.getElementById('searchInput'),
@@ -93,8 +101,13 @@ const el = {
   lightboxImg: document.getElementById('lightboxImg'),
   lightboxVideo: document.getElementById('lightboxVideo'),
   lightboxClose: document.getElementById('lightboxClose'),
-  readMoreModal: document.getElementById('readMoreModal'),
-  readMoreBody: document.getElementById('readMoreBody'),
+  feedbackModal: document.getElementById('feedbackModal'),
+  feedbackForm: document.getElementById('feedbackForm'),
+  feedbackInput: document.getElementById('feedbackInput'),
+  feedbackError: document.getElementById('feedbackError'),
+  sendFeedbackSubmit: document.getElementById('sendFeedbackSubmit'),
+  inboxModal: document.getElementById('inboxModal'),
+  inboxList: document.getElementById('inboxList'),
   scrollBottomBtn: document.getElementById('scrollBottomBtn'),
   newMsgDot: document.getElementById('newMsgDot')
 };
@@ -184,7 +197,9 @@ const ICONS = {
   check: `<svg class="icon-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`,
   edit: `<svg class="icon-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>`,
   trash: `<svg class="icon-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>`,
-  maximize: `<svg class="icon-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"/><path d="M9 21H3v-6"/><path d="M21 3l-7 7"/><path d="M3 21l7-7"/></svg>`
+  maximize: `<svg class="icon-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"/><path d="M9 21H3v-6"/><path d="M21 3l-7 7"/><path d="M3 21l7-7"/></svg>`,
+  bell: `<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>`,
+  bellOff: `<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8.7 3A6 6 0 0 1 18 8a21.3 21.3 0 0 0 .6 5"/><path d="M17 17H3s3-2 3-9a4.67 4.67 0 0 1 .3-1.7"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/><path d="m2 2 20 20"/></svg>`
 };
 
 // --- Theme & Preferences ---
@@ -233,6 +248,84 @@ function loadReactedMap() {
 
 function saveReactedMap() {
   localStorage.setItem(REACTED_STORAGE_KEY, JSON.stringify(state.reactedMap));
+}
+
+function renderNotifyButton() {
+  if (!el.notifyToggle) return;
+  const isEnabled =
+    state.notificationsEnabled &&
+    'Notification' in window &&
+    Notification.permission === 'granted';
+  el.notifyToggle.innerHTML = isEnabled ? ICONS.bell : ICONS.bellOff;
+  el.notifyToggle.classList.toggle('is-active', isEnabled);
+  el.notifyToggle.title = isEnabled
+    ? 'התראות דפדפן פעילות (לחץ לכיבוי)'
+    : 'הפעל התראות דפדפן על הודעות חדשות';
+}
+
+function initNotifications() {
+  state.notificationsEnabled = localStorage.getItem(NOTIFY_STORAGE_KEY) === '1';
+  renderNotifyButton();
+}
+
+async function toggleBrowserNotifications() {
+  if (!('Notification' in window)) {
+    showToast('הדפדפן שלך אינו תומך בהתראות שולחן עבודה', 'error');
+    return;
+  }
+
+  if (Notification.permission === 'denied') {
+    showToast('ההתראות חסומות בהגדרות הדפדפן עבור אתר זה', 'error');
+    return;
+  }
+
+  if (Notification.permission === 'default') {
+    const perm = await Notification.requestPermission();
+    if (perm !== 'granted') {
+      state.notificationsEnabled = false;
+      localStorage.setItem(NOTIFY_STORAGE_KEY, '0');
+      renderNotifyButton();
+      showToast('לא ניתנה הרשאה להתראות דפדפן');
+      return;
+    }
+    state.notificationsEnabled = true;
+    localStorage.setItem(NOTIFY_STORAGE_KEY, '1');
+    renderNotifyButton();
+    showToast('התראות דפדפן הופעלו!', 'success');
+    return;
+  }
+
+  state.notificationsEnabled = !state.notificationsEnabled;
+  localStorage.setItem(NOTIFY_STORAGE_KEY, state.notificationsEnabled ? '1' : '0');
+  renderNotifyButton();
+  showToast(
+    state.notificationsEnabled ? 'התראות דפדפן הופעלו!' : 'התראות דפדפן כובו',
+    state.notificationsEnabled ? 'success' : 'info'
+  );
+}
+
+function sendBrowserNotification(post) {
+  if (
+    !state.notificationsEnabled ||
+    !('Notification' in window) ||
+    Notification.permission !== 'granted'
+  ) {
+    return;
+  }
+  const title = `${state.settings.title || 'המקום'} • הודעה חדשה`;
+  const body =
+    (post?.content || '').trim().slice(0, 140) ||
+    (post?.media_name ? `מדיה חדשה: ${post.media_name}` : 'פורסם עדכון חדש בערוץ');
+
+  const n = new Notification(title, {
+    body,
+    tag: `hamakom-post-${post?.id || Date.now()}`
+  });
+  n.onclick = () => {
+    window.focus();
+    scrollToFeedBottom(true);
+    n.close();
+  };
 }
 
 // --- Demo Data ---
@@ -309,6 +402,7 @@ async function initSupabase() {
         const wasNearBottom = isNearFeedBottom();
         await fetchLiveData({ skipInitialRestore: true });
         if (payload.eventType === 'INSERT') {
+          sendBrowserNotification(payload.new);
           if (wasNearBottom) {
             scrollToFeedBottom(true);
           } else {
@@ -316,6 +410,21 @@ async function initSupabase() {
             el.scrollBottomBtn.classList.remove('hidden');
             showToast('הודעה חדשה פורסמה בערוץ');
           }
+        }
+      }
+    )
+    .subscribe();
+
+  state.supabase
+    .channel('public:feedback_messages')
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'feedback_messages' },
+      async (payload) => {
+        if (!state.isAdmin) return;
+        await fetchFeedbacks();
+        if (payload.eventType === 'INSERT') {
+          showToast('התקבל משוב חדש בתיבת ההודעות');
         }
       }
     )
@@ -337,8 +446,10 @@ async function handleAuthChange(session) {
 
   if (state.user) {
     await fetchLiveData();
+    if (state.isAdmin) await fetchFeedbacks();
   } else {
     state.posts = [];
+    state.feedbacks = [];
     hasRestoredInitialScroll = false;
     await fetchSettingsOnly();
   }
@@ -940,6 +1051,146 @@ async function deletePost(postId) {
   }
 }
 
+// --- Feedback & Admin Inbox ---
+function loadDemoFeedbacks() {
+  try {
+    state.feedbacks = JSON.parse(localStorage.getItem(DEMO_FEEDBACK_KEY) || '[]');
+  } catch {
+    state.feedbacks = [];
+  }
+  updateInboxBadge();
+}
+
+function saveDemoFeedbacks() {
+  localStorage.setItem(DEMO_FEEDBACK_KEY, JSON.stringify(state.feedbacks));
+}
+
+function updateInboxBadge() {
+  if (!el.inboxUnreadCount) return;
+  const unread = state.feedbacks.filter((f) => !f.is_read).length;
+  el.inboxUnreadCount.textContent = String(unread);
+  el.inboxUnreadCount.classList.toggle('hidden', unread === 0);
+}
+
+async function fetchFeedbacks() {
+  if (!state.isAdmin) return;
+  if (state.isDemo) {
+    loadDemoFeedbacks();
+    renderInbox();
+    return;
+  }
+  if (!state.supabase) return;
+  const { data } = await state.supabase
+    .from('feedback_messages')
+    .select('*')
+    .order('created_at', { ascending: false });
+  if (data) {
+    state.feedbacks = data;
+    updateInboxBadge();
+    renderInbox();
+  }
+}
+
+function renderInbox() {
+  if (!el.inboxList) return;
+  if (state.feedbacks.length === 0) {
+    el.inboxList.innerHTML = '<div class="inbox-empty">אין הודעות משוב עדיין.</div>';
+    return;
+  }
+
+  el.inboxList.innerHTML = state.feedbacks
+    .map(
+      (item) => `
+      <div class="inbox-item ${item.is_read ? '' : 'is-unread'}">
+        <div class="inbox-item-header">
+          <span class="inbox-sender">${escapeHtml(item.sender_email)}</span>
+          <time>${escapeHtml(formatDayLabel(item.created_at))} • ${escapeHtml(formatDate(item.created_at))}</time>
+        </div>
+        <div class="inbox-item-msg">${escapeHtml(item.message)}</div>
+        <div class="inbox-item-actions">
+          ${
+            !item.is_read
+              ? `<button type="button" class="btn btn-outline" data-fb-read="${item.id}">סמן כנקרא</button>`
+              : ''
+          }
+          <button type="button" class="btn btn-ghost" data-fb-delete="${item.id}">מחק</button>
+        </div>
+      </div>`
+    )
+    .join('');
+}
+
+async function submitFeedback(e) {
+  e.preventDefault();
+  el.feedbackError.classList.add('hidden');
+  const message = el.feedbackInput.value.trim();
+  if (!message) return;
+
+  el.sendFeedbackSubmit.disabled = true;
+  el.sendFeedbackSubmit.textContent = 'שולח...';
+
+  try {
+    if (state.isDemo) {
+      loadDemoFeedbacks();
+      state.feedbacks.unshift({
+        id: Date.now(),
+        sender_email: state.user?.email || 'demo@user.local',
+        message,
+        is_read: false,
+        created_at: new Date().toISOString()
+      });
+      saveDemoFeedbacks();
+      updateInboxBadge();
+      renderInbox();
+    } else {
+      const { error } = await state.supabase
+        .from('feedback_messages')
+        .insert({ message });
+      if (error) throw error;
+    }
+    el.feedbackInput.value = '';
+    closeModal('feedbackModal');
+    showToast('המשוב נשלח למנהלים בהצלחה!', 'success');
+  } catch (err) {
+    el.feedbackError.textContent = err.message || 'שגיאה בשליחת המשוב';
+    el.feedbackError.classList.remove('hidden');
+  } finally {
+    el.sendFeedbackSubmit.disabled = false;
+    el.sendFeedbackSubmit.textContent = 'שלח משוב';
+  }
+}
+
+async function markFeedbackRead(id) {
+  if (state.isDemo) {
+    const item = state.feedbacks.find((f) => String(f.id) === String(id));
+    if (item) item.is_read = true;
+    saveDemoFeedbacks();
+    updateInboxBadge();
+    renderInbox();
+    return;
+  }
+  const { error } = await state.supabase
+    .from('feedback_messages')
+    .update({ is_read: true })
+    .eq('id', id);
+  if (!error) await fetchFeedbacks();
+}
+
+async function deleteFeedback(id) {
+  if (state.isDemo) {
+    state.feedbacks = state.feedbacks.filter((f) => String(f.id) !== String(id));
+    saveDemoFeedbacks();
+    updateInboxBadge();
+    renderInbox();
+    return;
+  }
+  const { error } = await state.supabase
+    .from('feedback_messages')
+    .delete()
+    .eq('id', id);
+  if (!error) await fetchFeedbacks();
+}
+
 // --- Event Listeners ---
 function bindEvents() {
   document.querySelectorAll('[data-close]').forEach((node) => {
@@ -1052,6 +1303,7 @@ function bindEvents() {
     state.isAdmin = true;
     renderAuthUI();
     renderCategories();
+    loadDemoFeedbacks();
     renderFeed({ restoreScroll: !hasRestoredInitialScroll });
   });
 
@@ -1170,10 +1422,12 @@ function bindEvents() {
 
     const readMoreBtn = e.target.closest('[data-read-more]');
     if (readMoreBtn) {
-      const post = state.posts.find((p) => String(p.id) === String(readMoreBtn.dataset.readMore));
-      if (post) {
-        el.readMoreBody.innerHTML = formatContent(post.content || '');
-        openModal('readMoreModal');
+      const card = readMoreBtn.closest('.post-card');
+      const wrap = readMoreBtn.closest('[data-content-wrap]');
+      if (card && wrap) {
+        const expanded = card.classList.toggle('is-expanded');
+        wrap.classList.toggle('is-collapsed', !expanded);
+        readMoreBtn.textContent = expanded ? 'צמצם קריאה' : 'המשך קריאה';
       }
       return;
     }
@@ -1208,13 +1462,44 @@ function bindEvents() {
     if (e.target === el.lightbox) closeLightbox();
   });
 
+  // Browser Notifications Toggle
+  el.notifyToggle?.addEventListener('click', toggleBrowserNotifications);
+
+  // User Feedback & Admin Inbox
+  el.sendFeedbackBtn?.addEventListener('click', () => {
+    el.feedbackError.classList.add('hidden');
+    el.feedbackInput.value = '';
+    openModal('feedbackModal');
+    setTimeout(() => el.feedbackInput.focus(), 60);
+  });
+
+  el.feedbackForm?.addEventListener('submit', submitFeedback);
+
+  el.openInboxBtn?.addEventListener('click', async () => {
+    await fetchFeedbacks();
+    openModal('inboxModal');
+  });
+
+  el.inboxList?.addEventListener('click', (e) => {
+    const readBtn = e.target.closest('[data-fb-read]');
+    if (readBtn) {
+      markFeedbackRead(readBtn.dataset.fbRead);
+      return;
+    }
+    const delBtn = e.target.closest('[data-fb-delete]');
+    if (delBtn) {
+      deleteFeedback(delBtn.dataset.fbDelete);
+    }
+  });
+
   // Keyboard shortcuts (Esc to close modals/lightbox, / to search)
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
       if (!el.lightbox.classList.contains('hidden')) closeLightbox();
       closeModal('postModal');
       closeModal('settingsModal');
-      closeModal('readMoreModal');
+      closeModal('feedbackModal');
+      closeModal('inboxModal');
     } else if (
       e.key === '/' &&
       state.user &&
@@ -1244,6 +1529,7 @@ function bindEvents() {
 async function init() {
   initTheme();
   initBgPicker();
+  initNotifications();
   loadReactedMap();
   renderCategories();
   bindEvents();
