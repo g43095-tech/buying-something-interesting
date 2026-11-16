@@ -732,6 +732,18 @@ function renderFeed(options = {}) {
 }
 
 // --- Actions ---
+function updateReactionButtonsInDom(postId, reactions) {
+  const card = document.getElementById(`post-${postId}`);
+  if (!card) return;
+  const userReactedList = state.reactedMap[String(postId)] || [];
+  card.querySelectorAll('[data-react]').forEach((btn) => {
+    const emoji = btn.dataset.emoji;
+    const countSpan = btn.querySelector('span');
+    if (countSpan) countSpan.textContent = reactions[emoji] || 0;
+    btn.classList.toggle('is-reacted', userReactedList.includes(emoji));
+  });
+}
+
 async function handleReaction(postId, emoji) {
   const key = String(postId);
   state.reactedMap[key] = state.reactedMap[key] || [];
@@ -748,7 +760,7 @@ async function handleReaction(postId, emoji) {
     post.reactions = post.reactions || {};
     post.reactions[emoji] = (post.reactions[emoji] || 0) + 1;
     saveDemoData();
-    renderFeed();
+    updateReactionButtonsInDom(postId, post.reactions);
     return;
   }
 
@@ -760,7 +772,7 @@ async function handleReaction(postId, emoji) {
     const post = state.posts.find((p) => String(p.id) === key);
     if (post) {
       post.reactions = data;
-      renderFeed();
+      updateReactionButtonsInDom(postId, data);
     }
   }
 }
