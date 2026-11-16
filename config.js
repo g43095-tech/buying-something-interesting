@@ -4,7 +4,7 @@
 
 window.CHANNEL_CONFIG = {
   SUPABASE_URL: 'https://sqqghfcdgswvwvbiulwk.supabase.co',
-  SUPABASE_ANON_KEY: '',
+  SUPABASE_ANON_KEY: 'sb_publishable_pqVvNzzJ3tmGLeCqAyQYqQ_7jUfcumU',
 
   // הגדרות ברירת מחדל לפני שטוענים ממסד הנתונים
   DEFAULT_TITLE: 'הערוץ שלי',
