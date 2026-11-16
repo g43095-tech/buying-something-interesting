@@ -930,23 +930,19 @@ body[data-bg="clean"] .bg-ambient {
 }
 
 .pinned-jump-icon {
-  background: var(--surface);
-  border: 1px solid var(--pinned-border);
-  border-radius: 10px;
-  width: 34px;
-  height: 34px;
+  background: transparent;
+  border: none;
+  padding: 0;
   color: var(--primary);
-  display: grid;
+  display: inline-grid;
   place-items: center;
   flex-shrink: 0;
-  transition: transform 0.15s ease, background 0.15s ease, color 0.15s ease;
+  transition: transform 0.15s ease, color 0.15s ease;
 }
 
 .pinned-banner:hover .pinned-jump-icon {
-  background: var(--primary);
-  border-color: var(--primary);
-  color: #fff;
-  transform: scale(1.06);
+  color: var(--primary-hover);
+  transform: scale(1.1);
 }
 
 .icon-hand-tap {
