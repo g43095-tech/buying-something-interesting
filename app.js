@@ -759,59 +759,6 @@ function bindEvents() {
     renderFeed();
   });
 
-  // Auth button
-  el.authBtn.addEventListener('click', () => {
-    el.loginError.classList.add('hidden');
-    el.demoLoginNotice.classList.toggle('hidden', !state.isDemo);
-    el.demoLoginBtn.classList.toggle('hidden', !state.isDemo);
-    el.loginForm.classList.toggle('hidden', state.isDemo);
-    el.googleLoginBtn.classList.toggle('hidden', state.isDemo);
-    openModal('loginModal');
-  });
-
-  // Demo login
-  el.demoLoginBtn.addEventListener('click', () => {
-    state.user = { email: 'demo@admin.local' };
-    state.isAdmin = true;
-    renderAuthUI();
-    renderFeed();
-    closeModal('loginModal');
-  });
-
-  // Email/Password login
-  el.loginForm.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    el.loginError.classList.add('hidden');
-    const { data, error } = await state.supabase.auth.signInWithPassword({
-      email: el.loginEmail.value.trim(),
-      password: el.loginPassword.value
-    });
-    if (error) {
-      el.loginError.textContent = error.message;
-      el.loginError.classList.remove('hidden');
-      return;
-    }
-    await handleAuthChange(data.session);
-    if (!state.isAdmin) {
-      el.loginError.textContent = 'התחברת בהצלחה, אך כתובת המייל הזו אינה מופיעה בטבלת המנהלים (admins).';
-      el.loginError.classList.remove('hidden');
-      return;
-    }
-    closeModal('loginModal');
-  });
-
-  // Google OAuth login
-  el.googleLoginBtn.addEventListener('click', async () => {
-    const { error } = await state.supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: { redirectTo: window.location.origin + window.location.pathname }
-    });
-    if (error) {
-      el.loginError.textContent = error.message;
-      el.loginError.classList.remove('hidden');
-    }
-  });
-
   // Gate Tabs (signin / signup)
   el.gateAuthTabs.addEventListener('click', (e) => {
     const tab = e.target.closest('[data-auth-tab]');
