@@ -848,29 +848,105 @@ body[data-bg="clean"] .bg-ambient {
   font-size: 0.82rem;
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 5px;
   color: #b45309;
   flex-shrink: 0;
 }
 
-.pinned-text {
-  flex: 1;
-  font-size: 0.86rem;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+.pinned-counter {
+  font-size: 0.72rem;
+  font-weight: 700;
+  background: rgba(180, 83, 9, 0.14);
+  color: #b45309;
+  padding: 1px 6px;
+  border-radius: 999px;
 }
 
-.pinned-jump {
+[data-theme="dark"] .pinned-counter {
+  color: #fbbf24;
+  background: rgba(251, 191, 36, 0.16);
+}
+
+.pinned-viewport {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+}
+
+.pinned-text {
+  display: inline-block;
+  font-size: 0.86rem;
+  white-space: nowrap;
+  will-change: transform;
+  transition: opacity 0.25s ease;
+}
+
+.pinned-text p,
+.pinned-text div,
+.pinned-text h1,
+.pinned-text h2,
+.pinned-text h3,
+.pinned-text blockquote,
+.pinned-text ul,
+.pinned-text ol,
+.pinned-text li {
+  display: inline;
+  margin: 0;
+  padding: 0;
+  font-size: inherit;
+  list-style: none;
+}
+
+.pinned-text br {
+  display: none;
+}
+
+.pinned-text p + p::before,
+.pinned-text div + div::before,
+.pinned-text li::after {
+  content: " • ";
+  opacity: 0.55;
+}
+
+.pinned-text a {
+  color: var(--primary);
+  text-decoration: underline;
+  pointer-events: none;
+}
+
+.pinned-text.is-scrolling {
+  animation: pinnedMarquee var(--marquee-duration, 12s) linear infinite;
+}
+
+.pinned-banner:hover .pinned-text.is-scrolling {
+  animation-play-state: paused;
+}
+
+@keyframes pinnedMarquee {
+  0%, 14% { transform: translateX(0); }
+  82%, 100% { transform: translateX(var(--scroll-dist, 0px)); }
+}
+
+.pinned-jump-icon {
   background: var(--surface);
   border: 1px solid var(--pinned-border);
-  border-radius: 8px;
-  padding: 3px 10px;
+  border-radius: 9px;
+  width: 30px;
+  height: 30px;
   color: var(--primary);
-  font-family: inherit;
-  font-weight: 600;
-  cursor: pointer;
-  font-size: 0.8rem;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  transition: transform 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+
+.pinned-banner:hover .pinned-jump-icon {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+  transform: scale(1.06);
 }
 
 /* Auth Gate */

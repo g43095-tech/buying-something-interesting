@@ -47,6 +47,9 @@ const PAGE_SIZE = 25;
 let hasMoreOlder = false;
 let hasRestoredInitialScroll = false;
 let viewObserver = null;
+let pinnedRotationTimer = null;
+let pinnedRotateIndex = 0;
+let pinnedBannerHovered = false;
 
 // --- DOM Elements ---
 const el = {
@@ -105,6 +108,8 @@ const el = {
   searchInput: document.getElementById('searchInput'),
   categoryChips: document.getElementById('categoryChips'),
   pinnedBanner: document.getElementById('pinnedBanner'),
+  pinnedCounter: document.getElementById('pinnedCounter'),
+  pinnedViewport: document.getElementById('pinnedViewport'),
   pinnedText: document.getElementById('pinnedText'),
   loadOlderWrap: document.getElementById('loadOlderWrap'),
   loadOlderBtn: document.getElementById('loadOlderBtn'),
@@ -887,13 +892,18 @@ async function fetchSettingsOnly() {
 async function fetchLiveData(opts = {}) {
   if (!state.supabase || !state.user) return;
 
-  const [settingsRes, postsRes] = await Promise.all([
+  const [settingsRes, postsRes, pinnedRes] = await Promise.all([
     state.supabase.from('channel_settings').select('*').eq('id', 1).maybeSingle(),
     state.supabase
       .from('posts')
       .select('*')
       .order('created_at', { ascending: false })
-      .limit(PAGE_SIZE)
+      .limit(PAGE_SIZE),
+    state.supabase
+      .from('posts')
+      .select('*')
+      .eq('is_pinned', true)
+      .order('created_at', { ascending: true })
   ]);
 
   if (settingsRes.data) {
@@ -905,7 +915,12 @@ async function fetchLiveData(opts = {}) {
     hasMoreOlder = postsRes.data.length === PAGE_SIZE;
     el.loadOlderWrap?.classList.toggle('hidden', !hasMoreOlder);
 
-    const chronological = [...postsRes.data].reverse();
+    const byId = new Map();
+    (pinnedRes.data || []).forEach((p) => byId.set(String(p.id), p));
+    [...postsRes.data].reverse().forEach((p) => byId.set(String(p.id), p));
+    const chronological = [...byId.values()].sort(
+      (a, b) => new Date(a.created_at) - new Date(b.created_at)
+    );
     const nextPosts = attachCachedSignedUrls(chronological);
     const sig = (arr) =>
       JSON.stringify(
@@ -1072,23 +1087,69 @@ function renderCategories() {
     .join('');
 }
 
-function renderPinnedBanner() {
-  const pinned = [...state.posts].reverse().find((p) => p.is_pinned);
-  if (!pinned) {
-    el.pinnedBanner.classList.add('hidden');
-    return;
+function showPinnedItem(pinnedPosts) {
+  if (!pinnedPosts.length) return;
+  pinnedRotateIndex = pinnedRotateIndex % pinnedPosts.length;
+  const pinned = pinnedPosts[pinnedRotateIndex];
+
+  if (el.pinnedCounter) {
+    if (pinnedPosts.length > 1) {
+      el.pinnedCounter.textContent = `${pinnedRotateIndex + 1}/${pinnedPosts.length}`;
+      el.pinnedCounter.classList.remove('hidden');
+    } else {
+      el.pinnedCounter.classList.add('hidden');
+    }
   }
 
-  el.pinnedBanner.classList.remove('hidden');
-  el.pinnedText.textContent = stripHtml(pinned.content) || pinned.media_name || 'הודעה נעוצה';
+  el.pinnedText.classList.remove('is-scrolling');
+  el.pinnedText.style.removeProperty('--scroll-dist');
+  el.pinnedText.style.removeProperty('--marquee-duration');
+
+  el.pinnedText.innerHTML = pinned.content
+    ? formatContent(pinned.content)
+    : escapeHtml(pinned.media_name || 'הודעה נעוצה');
+
+  let cycleDurationMs = 7500;
+  requestAnimationFrame(() => {
+    if (!el.pinnedViewport || !el.pinnedText) return;
+    const overflow = el.pinnedText.scrollWidth - el.pinnedViewport.clientWidth;
+    if (overflow > 12) {
+      const dist = overflow + 20;
+      const durationSec = Math.max(8, Math.round(dist / 36) + 3);
+      cycleDurationMs = Math.max(8500, durationSec * 1000);
+      el.pinnedText.style.setProperty('--scroll-dist', `${dist}px`);
+      el.pinnedText.style.setProperty('--marquee-duration', `${durationSec}s`);
+      el.pinnedText.classList.add('is-scrolling');
+    }
+
+    clearTimeout(pinnedRotationTimer);
+    if (pinnedPosts.length > 1) {
+      pinnedRotationTimer = setTimeout(() => {
+        if (!pinnedBannerHovered) {
+          pinnedRotateIndex = (pinnedRotateIndex + 1) % pinnedPosts.length;
+        }
+        showPinnedItem(pinnedPosts);
+      }, cycleDurationMs);
+    }
+  });
+
   const jumpToPinned = () => {
-    const card = document.getElementById(`post-${pinned.id}`);
+    let card = document.getElementById(`post-${pinned.id}`);
+    if (!card) {
+      state.activeCategory = 'הכל';
+      state.searchQuery = '';
+      if (el.searchInput) el.searchInput.value = '';
+      renderCategories();
+      renderFeed();
+      card = document.getElementById(`post-${pinned.id}`);
+    }
     if (card) {
       card.scrollIntoView({ behavior: 'smooth', block: 'center' });
       card.classList.add('highlight');
       setTimeout(() => card.classList.remove('highlight'), 1800);
     }
   };
+
   el.pinnedBanner.onclick = jumpToPinned;
   el.pinnedBanner.onkeydown = (e) => {
     if (e.key === 'Enter' || e.key === ' ') {
@@ -1096,6 +1157,18 @@ function renderPinnedBanner() {
       jumpToPinned();
     }
   };
+}
+
+function renderPinnedBanner() {
+  clearTimeout(pinnedRotationTimer);
+  const pinnedPosts = [...state.posts].reverse().filter((p) => p.is_pinned);
+  if (!pinnedPosts.length) {
+    el.pinnedBanner.classList.add('hidden');
+    return;
+  }
+
+  el.pinnedBanner.classList.remove('hidden');
+  showPinnedItem(pinnedPosts);
 }
 
 function renderMedia(post) {
@@ -2477,6 +2550,14 @@ function bindEvents() {
       el.hoverSearchWrap?.classList.add('is-open');
       el.searchInput.focus();
     }
+  });
+
+  // Pause pinned rotation while user hovers to read
+  el.pinnedBanner?.addEventListener('mouseenter', () => {
+    pinnedBannerHovered = true;
+  });
+  el.pinnedBanner?.addEventListener('mouseleave', () => {
+    pinnedBannerHovered = false;
   });
 
   // Scroll bottom & persistent anchor position
