@@ -88,7 +88,11 @@ const el = {
 
   lightbox: document.getElementById('lightbox'),
   lightboxImg: document.getElementById('lightboxImg'),
-  lightboxClose: document.getElementById('lightboxClose')
+  lightboxVideo: document.getElementById('lightboxVideo'),
+  lightboxClose: document.getElementById('lightboxClose'),
+  readMoreModal: document.getElementById('readMoreModal'),
+  readMoreBody: document.getElementById('readMoreBody'),
+  scrollBottomBtn: document.getElementById('scrollBottomBtn')
 };
 
 // --- Helpers ---
@@ -155,7 +159,8 @@ const ICONS = {
   link: `<svg class="icon-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>`,
   check: `<svg class="icon-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`,
   edit: `<svg class="icon-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>`,
-  trash: `<svg class="icon-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>`
+  trash: `<svg class="icon-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>`,
+  maximize: `<svg class="icon-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"/><path d="M9 21H3v-6"/><path d="M21 3l-7 7"/><path d="M3 21l7-7"/></svg>`
 };
 
 // --- Theme ---
@@ -189,17 +194,6 @@ function loadDemoData() {
 
   state.posts = [
     {
-      id: 1,
-      content: 'ברוכים הבאים לערוץ החדש! 🎉\nהערוץ פועל כרגע במצב הדגמה מקומי. לאחר חיבור קובץ config.js ל-Supabase (חינמי ללא כרטיס אשראי), כל הפוסטים, התמונות והסרטונים יישמרו בענן ויתעדכנו בזמן אמת.',
-      media_type: 'none',
-      media_url: '',
-      media_name: '',
-      category: 'עדכונים',
-      is_pinned: true,
-      reactions: { '👍': 12, '❤️': 8, '🔥': 5 },
-      created_at: new Date().toISOString()
-    },
-    {
       id: 2,
       content: 'אפשר לפרסם כאן הודעות טקסט עם קישורים, תמונות, סרטונים, הקלטות שמע וקבצים להורדה — עם סינון לפי קטגוריות וחיפוש מהיר.',
       media_type: 'none',
@@ -209,6 +203,17 @@ function loadDemoData() {
       is_pinned: false,
       reactions: { '👍': 4, '👏': 3 },
       created_at: new Date(Date.now() - 3600 * 1000).toISOString()
+    },
+    {
+      id: 1,
+      content: 'ברוכים הבאים לערוץ המקום! 🎉\nהערוץ פועל כרגע במצב הדגמה מקומי. לאחר חיבור קובץ config.js ל-Supabase (חינמי ללא כרטיס אשראי), כל הפוסטים, התמונות והסרטונים יישמרו בענן ויתעדכנו בזמן אמת.',
+      media_type: 'none',
+      media_url: '',
+      media_name: '',
+      category: 'עדכונים',
+      is_pinned: true,
+      reactions: { '👍': 12, '❤️': 8, '🔥': 5 },
+      created_at: new Date().toISOString()
     }
   ];
   saveDemoData();
@@ -322,11 +327,11 @@ async function fetchLiveData() {
   const postsRes = await state.supabase
     .from('posts')
     .select('*')
-    .order('created_at', { ascending: false });
+    .order('created_at', { ascending: true });
 
   if (postsRes.data) {
     state.posts = await resolveMediaUrls(postsRes.data);
-    renderFeed();
+    renderFeed({ scrollToBottom: true });
   }
 }
 
@@ -427,9 +432,25 @@ function renderMedia(post) {
 
   switch (post.media_type) {
     case 'image':
-      return `<div class="post-media"><img src="${url}" alt="${name}" loading="lazy" data-lightbox="${url}" /></div>`;
+      return `
+        <div class="post-media">
+          <div class="media-frame">
+            <img src="${url}" alt="${name}" loading="lazy" data-fullscreen-type="image" data-fullscreen-src="${url}" />
+            <button type="button" class="media-fullscreen-btn" data-fullscreen-type="image" data-fullscreen-src="${url}">
+              ${ICONS.maximize}<span>תצוגה מלאה</span>
+            </button>
+          </div>
+        </div>`;
     case 'video':
-      return `<div class="post-media"><video src="${url}" controls preload="metadata"></video></div>`;
+      return `
+        <div class="post-media">
+          <div class="media-frame">
+            <video src="${url}" controls preload="metadata" playsinline></video>
+            <button type="button" class="media-fullscreen-btn" data-fullscreen-type="video" data-fullscreen-src="${url}">
+              ${ICONS.maximize}<span>תצוגה מלאה</span>
+            </button>
+          </div>
+        </div>`;
     case 'audio':
       return `<div class="post-media"><audio src="${url}" controls preload="metadata"></audio></div>`;
     case 'file':
@@ -439,7 +460,14 @@ function renderMedia(post) {
   }
 }
 
-function renderFeed() {
+function scrollToFeedBottom(smooth = false) {
+  window.scrollTo({
+    top: document.documentElement.scrollHeight,
+    behavior: smooth ? 'smooth' : 'auto'
+  });
+}
+
+function renderFeed(options = {}) {
   renderPinnedBanner();
 
   const q = state.searchQuery.trim().toLowerCase();
@@ -486,6 +514,13 @@ function renderFeed() {
           </div>`
         : '';
 
+      const contentHtml = post.content
+        ? `<div class="post-content-wrap" data-content-wrap="${post.id}">
+             <div class="post-content">${formatContent(post.content)}</div>
+             <button type="button" class="read-more-btn hidden" data-read-more="${post.id}">המשך קריאה</button>
+           </div>`
+        : '';
+
       return `
         ${dayDividerHtml}
         <article class="post-card" id="post-${post.id}">
@@ -497,7 +532,7 @@ function renderFeed() {
             </div>
             ${adminControls}
           </div>
-          ${post.content ? `<div class="post-content">${formatContent(post.content)}</div>` : ''}
+          ${contentHtml}
           ${renderMedia(post)}
           <div class="post-footer">
             <div class="reactions-row">${reactionsHtml}</div>
@@ -507,6 +542,20 @@ function renderFeed() {
       `;
     })
     .join('');
+
+  // Collapse long text blocks so no post exceeds viewport height
+  el.feedContainer.querySelectorAll('[data-content-wrap]').forEach((wrap) => {
+    const contentEl = wrap.querySelector('.post-content');
+    const btn = wrap.querySelector('.read-more-btn');
+    if (contentEl && btn && contentEl.scrollHeight > 175) {
+      wrap.classList.add('is-collapsed');
+      btn.classList.remove('hidden');
+    }
+  });
+
+  if (options.scrollToBottom && !window.location.hash.startsWith('#post-')) {
+    requestAnimationFrame(() => scrollToFeedBottom(false));
+  }
 }
 
 // --- Actions ---
@@ -610,7 +659,7 @@ async function savePost(e) {
         const idx = state.posts.findIndex((p) => String(p.id) === String(id));
         if (idx !== -1) state.posts[idx] = { ...state.posts[idx], ...payload };
       } else {
-        state.posts.unshift({
+        state.posts.push({
           id: Date.now(),
           ...payload,
           reactions: { '👍': 0, '❤️': 0, '🔥': 0 },
@@ -618,7 +667,7 @@ async function savePost(e) {
         });
       }
       saveDemoData();
-      renderFeed();
+      renderFeed({ scrollToBottom: !id });
     } else {
       if (id) {
         const { error } = await state.supabase.from('posts').update(payload).eq('id', id);
@@ -780,7 +829,7 @@ function bindEvents() {
     state.user = { email: 'demo@admin.local' };
     state.isAdmin = true;
     renderAuthUI();
-    renderFeed();
+    renderFeed({ scrollToBottom: true });
   });
 
   // Viewer Logout
@@ -845,7 +894,7 @@ function bindEvents() {
     closeModal('settingsModal');
   });
 
-  // Feed delegation (reactions, edit, delete, share, lightbox)
+  // Feed delegation (reactions, edit, delete, share, read more, fullscreen media)
   el.feedContainer.addEventListener('click', (e) => {
     const reactBtn = e.target.closest('[data-react]');
     if (reactBtn) {
@@ -875,17 +924,54 @@ function bindEvents() {
       return;
     }
 
-    const img = e.target.closest('[data-lightbox]');
-    if (img) {
-      el.lightboxImg.src = img.dataset.lightbox;
+    const readMoreBtn = e.target.closest('[data-read-more]');
+    if (readMoreBtn) {
+      const post = state.posts.find((p) => String(p.id) === String(readMoreBtn.dataset.readMore));
+      if (post) {
+        el.readMoreBody.innerHTML = formatContent(post.content || '');
+        openModal('readMoreModal');
+      }
+      return;
+    }
+
+    const mediaTrigger = e.target.closest('[data-fullscreen-src]');
+    if (mediaTrigger) {
+      const type = mediaTrigger.dataset.fullscreenType;
+      const src = mediaTrigger.dataset.fullscreenSrc;
+      if (type === 'video') {
+        el.lightboxImg.classList.add('hidden');
+        el.lightboxVideo.src = src;
+        el.lightboxVideo.classList.remove('hidden');
+      } else {
+        el.lightboxVideo.pause();
+        el.lightboxVideo.classList.add('hidden');
+        el.lightboxImg.src = src;
+        el.lightboxImg.classList.remove('hidden');
+      }
       el.lightbox.classList.remove('hidden');
     }
   });
 
   // Lightbox close
-  el.lightboxClose.addEventListener('click', () => el.lightbox.classList.add('hidden'));
+  function closeLightbox() {
+    el.lightbox.classList.add('hidden');
+    el.lightboxVideo.pause();
+    el.lightboxVideo.removeAttribute('src');
+    el.lightboxImg.removeAttribute('src');
+  }
+
+  el.lightboxClose.addEventListener('click', closeLightbox);
   el.lightbox.addEventListener('click', (e) => {
-    if (e.target === el.lightbox) el.lightbox.classList.add('hidden');
+    if (e.target === el.lightbox) closeLightbox();
+  });
+
+  // Floating scroll-to-bottom button
+  el.scrollBottomBtn.addEventListener('click', () => scrollToFeedBottom(true));
+  window.addEventListener('scroll', () => {
+    if (!state.user) return;
+    const distanceFromBottom =
+      document.documentElement.scrollHeight - (window.scrollY + window.innerHeight);
+    el.scrollBottomBtn.classList.toggle('hidden', distanceFromBottom < 260);
   });
 }
 

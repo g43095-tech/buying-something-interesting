@@ -121,6 +121,11 @@
       <main class="feed-container" id="feedContainer">
         <div class="loading-state" id="loadingState">טוען עדכונים...</div>
       </main>
+
+      <!-- כפתור צף לגלילה להודעה האחרונה -->
+      <button id="scrollBottomBtn" class="scroll-bottom-btn hidden" title="קפוץ להודעה האחרונה" aria-label="קפוץ להודעה האחרונה">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+      </button>
     </div>
   </div>
 
@@ -258,12 +263,29 @@
     </div>
   </div>
 
-  <!-- תצוגת תמונה מוגדלת (Lightbox) -->
+  <!-- מודאל קריאה מלאה לטקסט ארוך -->
+  <div id="readMoreModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="readMoreTitle">
+    <div class="modal-backdrop" data-close="readMoreModal"></div>
+    <div class="modal-card modal-lg">
+      <div class="modal-header">
+        <h2 id="readMoreTitle">תוכן ההודעה המלא</h2>
+        <button class="icon-btn" data-close="readMoreModal" aria-label="סגור">
+          <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div id="readMoreBody" class="post-content"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- תצוגת מדיה מוגדלת על כל המסך (תמונה או סרטון) -->
   <div id="lightbox" class="lightbox hidden" role="dialog" aria-modal="true">
-    <button class="lightbox-close" id="lightboxClose" aria-label="סגור תמונה">
+    <button class="lightbox-close" id="lightboxClose" aria-label="סגור תצוגה מוגדלת">
       <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
     </button>
-    <img id="lightboxImg" src="" alt="תמונה מוגדלת" />
+    <img id="lightboxImg" class="hidden" src="" alt="תמונה מוגדלת" />
+    <video id="lightboxVideo" class="hidden" src="" controls autoplay playsinline></video>
   </div>
 
   <script src="config.js"></script>
