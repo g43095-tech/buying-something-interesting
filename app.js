@@ -111,18 +111,29 @@ function closeModal(id) {
   document.getElementById(id)?.classList.add('hidden');
 }
 
+const ICONS = {
+  moon: `<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>`,
+  sun: `<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>`,
+  pin: `<svg class="icon-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" x2="12" y1="17" y2="22"/><path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z"/></svg>`,
+  paperclip: `<svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>`,
+  link: `<svg class="icon-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>`,
+  check: `<svg class="icon-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`,
+  edit: `<svg class="icon-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>`,
+  trash: `<svg class="icon-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>`
+};
+
 // --- Theme ---
 function initTheme() {
   const saved = localStorage.getItem('channel_theme') || 'light';
   document.documentElement.setAttribute('data-theme', saved);
-  el.themeToggle.textContent = saved === 'dark' ? '☀️' : '🌙';
+  el.themeToggle.innerHTML = saved === 'dark' ? ICONS.sun : ICONS.moon;
 
   el.themeToggle.addEventListener('click', () => {
     const current = document.documentElement.getAttribute('data-theme');
     const next = current === 'dark' ? 'light' : 'dark';
     document.documentElement.setAttribute('data-theme', next);
     localStorage.setItem('channel_theme', next);
-    el.themeToggle.textContent = next === 'dark' ? '☀️' : '🌙';
+    el.themeToggle.innerHTML = next === 'dark' ? ICONS.sun : ICONS.moon;
   });
 }
 
@@ -319,7 +330,7 @@ function renderMedia(post) {
     case 'audio':
       return `<div class="post-media"><audio src="${url}" controls preload="metadata"></audio></div>`;
     case 'file':
-      return `<div class="post-media"><a class="file-attachment" href="${url}" target="_blank" rel="noopener noreferrer">📎 ${name}</a></div>`;
+      return `<div class="post-media"><a class="file-attachment" href="${url}" target="_blank" rel="noopener noreferrer">${ICONS.paperclip}<span>${name}</span></a></div>`;
     default:
       return '';
   }
@@ -359,8 +370,8 @@ function renderFeed() {
       const adminControls = state.isAdmin
         ? `
           <div class="post-admin-actions">
-            <button data-edit="${post.id}">עריכה</button>
-            <button class="delete-btn" data-delete="${post.id}">מחיקה</button>
+            <button class="btn-with-icon" data-edit="${post.id}">${ICONS.edit}<span>עריכה</span></button>
+            <button class="btn-with-icon delete-btn" data-delete="${post.id}">${ICONS.trash}<span>מחיקה</span></button>
           </div>`
         : '';
 
@@ -369,7 +380,7 @@ function renderFeed() {
           <div class="post-header">
             <div class="post-meta">
               <span class="post-cat">${escapeHtml(post.category || 'כללי')}</span>
-              ${post.is_pinned ? '<span class="post-pin-tag">📌 נעוץ</span>' : ''}
+              ${post.is_pinned ? `<span class="post-pin-tag">${ICONS.pin}<span>נעוץ</span></span>` : ''}
               <time datetime="${escapeHtml(post.created_at)}">${formatDate(post.created_at)}</time>
             </div>
             ${adminControls}
@@ -378,7 +389,7 @@ function renderFeed() {
           ${renderMedia(post)}
           <div class="post-footer">
             <div class="reactions-row">${reactionsHtml}</div>
-            <button class="share-btn" data-share="${post.id}">🔗 העתק קישור</button>
+            <button class="share-btn btn-with-icon" data-share="${post.id}">${ICONS.link}<span>העתק קישור</span></button>
           </div>
         </article>
       `;
@@ -674,8 +685,8 @@ function bindEvents() {
     if (shareBtn) {
       const url = `${window.location.origin}${window.location.pathname}#post-${shareBtn.dataset.share}`;
       navigator.clipboard?.writeText(url);
-      shareBtn.textContent = '✓ הועתק!';
-      setTimeout(() => (shareBtn.textContent = '🔗 העתק קישור'), 1500);
+      shareBtn.innerHTML = `${ICONS.check}<span>הועתק!</span>`;
+      setTimeout(() => (shareBtn.innerHTML = `${ICONS.link}<span>העתק קישור</span>`), 1500);
       return;
     }
 

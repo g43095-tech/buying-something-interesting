@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>הערוץ שלי</title>
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📢</text></svg>" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%230284c7' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M4.9 19.1C1 15.2 1 8.8 4.9 4.9'/><path d='M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.5'/><circle cx='12' cy='12' r='2'/><path d='M16.2 7.8c2.3 2.3 2.3 6.1 0 8.5'/><path d='M19.1 4.9C23 8.8 23 15.1 19.1 19'/></svg>" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600;700&display=swap" rel="stylesheet" />
@@ -26,8 +26,12 @@
       </div>
 
       <div class="header-actions">
-        <button id="themeToggle" class="icon-btn" title="החלף מצב תצוגה (בהיר/כהה)" aria-label="החלף מצב תצוגה">🌙</button>
-        <button id="adminSettingsBtn" class="icon-btn hidden" title="הגדרות ערוץ" aria-label="הגדרות ערוץ">⚙️</button>
+        <button id="themeToggle" class="icon-btn" title="החלף מצב תצוגה (בהיר/כהה)" aria-label="החלף מצב תצוגה">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+        </button>
+        <button id="adminSettingsBtn" class="icon-btn hidden" title="הגדרות ערוץ" aria-label="הגדרות ערוץ">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+        </button>
         <button id="authBtn" class="btn btn-outline">כניסת מנהל</button>
       </div>
     </header>
@@ -38,15 +42,23 @@
         <span>מחובר כמנהל: <strong id="adminEmailDisplay"></strong></span>
       </div>
       <div class="admin-bar-actions">
-        <button id="newPostBtn" class="btn btn-primary">+ פוסט חדש</button>
-        <button id="logoutBtn" class="btn btn-ghost">התנתק</button>
+        <button id="newPostBtn" class="btn btn-primary btn-with-icon">
+          <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+          <span>פוסט חדש</span>
+        </button>
+        <button id="logoutBtn" class="btn btn-ghost btn-with-icon">
+          <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg>
+          <span>התנתק</span>
+        </button>
       </div>
     </section>
 
     <!-- סרגל חיפוש וסינון קטגוריות -->
     <section class="toolbar">
       <div class="search-box">
-        <span class="search-icon">🔍</span>
+        <span class="search-icon" aria-hidden="true">
+          <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+        </span>
         <input type="search" id="searchInput" placeholder="חיפוש בערוץ..." aria-label="חיפוש בערוץ" />
       </div>
       <div class="category-chips" id="categoryChips" role="tablist" aria-label="סינון לפי קטגוריה"></div>
@@ -54,7 +66,10 @@
 
     <!-- הודעה נעוצה -->
     <section id="pinnedBanner" class="pinned-banner hidden">
-      <div class="pinned-label">📌 הודעה נעוצה</div>
+      <div class="pinned-label">
+        <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" x2="12" y1="17" y2="22"/><path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z"/></svg>
+        <span>הודעה נעוצה</span>
+      </div>
       <div class="pinned-text" id="pinnedText"></div>
       <button id="jumpToPinnedBtn" class="pinned-jump">עבור להודעה</button>
     </section>
@@ -71,7 +86,9 @@
     <div class="modal-card">
       <div class="modal-header">
         <h2 id="loginModalTitle">כניסת מנהל</h2>
-        <button class="icon-btn" data-close="loginModal" aria-label="סגור">✕</button>
+        <button class="icon-btn" data-close="loginModal" aria-label="סגור">
+          <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+        </button>
       </div>
       <div class="modal-body">
         <div id="demoLoginNotice" class="info-box hidden">
@@ -105,7 +122,9 @@
     <div class="modal-card modal-lg">
       <div class="modal-header">
         <h2 id="postModalTitle">פוסט חדש</h2>
-        <button class="icon-btn" data-close="postModal" aria-label="סגור">✕</button>
+        <button class="icon-btn" data-close="postModal" aria-label="סגור">
+          <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+        </button>
       </div>
       <form id="postForm" class="modal-body stack-form">
         <input type="hidden" id="editPostId" />
@@ -170,7 +189,9 @@
     <div class="modal-card">
       <div class="modal-header">
         <h2 id="settingsModalTitle">הגדרות ערוץ</h2>
-        <button class="icon-btn" data-close="settingsModal" aria-label="סגור">✕</button>
+        <button class="icon-btn" data-close="settingsModal" aria-label="סגור">
+          <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+        </button>
       </div>
       <form id="settingsForm" class="modal-body stack-form">
         <label>
@@ -195,7 +216,9 @@
 
   <!-- תצוגת תמונה מוגדלת (Lightbox) -->
   <div id="lightbox" class="lightbox hidden" role="dialog" aria-modal="true">
-    <button class="lightbox-close" id="lightboxClose" aria-label="סגור תמונה">✕</button>
+    <button class="lightbox-close" id="lightboxClose" aria-label="סגור תמונה">
+      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+    </button>
     <img id="lightboxImg" src="" alt="תמונה מוגדלת" />
   </div>
 

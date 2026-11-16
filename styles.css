@@ -44,6 +44,30 @@ body {
   transition: background 0.2s ease, color 0.2s ease;
 }
 
+.icon {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+.icon-sm {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
+.icon-xs {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
+.btn-with-icon {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .hidden {
   display: none !important;
 }
@@ -235,7 +259,9 @@ body {
   position: absolute;
   right: 12px;
   pointer-events: none;
-  font-size: 0.95rem;
+  color: var(--text-muted);
+  display: inline-flex;
+  align-items: center;
 }
 
 .search-box input {
@@ -295,6 +321,10 @@ body {
 .pinned-label {
   font-weight: 600;
   font-size: 0.85rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: #b45309;
 }
 
 .pinned-text {
@@ -376,6 +406,9 @@ body {
 .post-pin-tag {
   color: #d97706;
   font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .post-admin-actions {
