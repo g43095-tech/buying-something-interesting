@@ -568,16 +568,22 @@ function bindEvents() {
   el.loginForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     el.loginError.classList.add('hidden');
-    const { error } = await state.supabase.auth.signInWithPassword({
+    const { data, error } = await state.supabase.auth.signInWithPassword({
       email: el.loginEmail.value.trim(),
       password: el.loginPassword.value
     });
     if (error) {
       el.loginError.textContent = error.message;
       el.loginError.classList.remove('hidden');
-    } else {
-      closeModal('loginModal');
+      return;
     }
+    await handleAuthChange(data.session);
+    if (!state.isAdmin) {
+      el.loginError.textContent = 'התחברת בהצלחה, אך כתובת המייל הזו אינה מופיעה בטבלת המנהלים (admins).';
+      el.loginError.classList.remove('hidden');
+      return;
+    }
+    closeModal('loginModal');
   });
 
   // Google OAuth login
