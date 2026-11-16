@@ -3,7 +3,7 @@
 // לאחר יצירת פרויקט ב-Supabase, הדביקו כאן את ה-Project URL ואת ה-anon public key.
 
 window.CHANNEL_CONFIG = {
-  SUPABASE_URL: '',
+  SUPABASE_URL: 'https://sqqghfcdgswvwvbiulwk.supabase.co',
   SUPABASE_ANON_KEY: '',
 
   // הגדרות ברירת מחדל לפני שטוענים ממסד הנתונים
