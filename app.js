@@ -19,17 +19,20 @@ const state = {
 };
 
 const DEMO_STORAGE_KEY = 'private_channel_demo_v1';
+const SCROLL_STORAGE_KEY = 'hamakom_scroll_y_v1';
+const BG_STORAGE_KEY = 'hamakom_bg_choice';
+let hasRestoredInitialScroll = false;
 
 // --- DOM Elements ---
 const el = {
   channelTitle: document.getElementById('channelTitle'),
   channelDescription: document.getElementById('channelDescription'),
   channelAvatar: document.getElementById('channelAvatar'),
-  modeBadge: document.getElementById('modeBadge'),
   themeToggle: document.getElementById('themeToggle'),
   adminSettingsBtn: document.getElementById('adminSettingsBtn'),
-  viewerLogoutBtn: document.getElementById('viewerLogoutBtn'),
-  authBtn: document.getElementById('authBtn'),
+  profileEmail: document.getElementById('profileEmail'),
+  bgPicker: document.getElementById('bgPicker'),
+  hoverSearchWrap: document.getElementById('hoverSearchWrap'),
   authGate: document.getElementById('authGate'),
   gateChannelTitle: document.getElementById('gateChannelTitle'),
   gateDemoNotice: document.getElementById('gateDemoNotice'),
@@ -175,6 +178,27 @@ function initTheme() {
     document.documentElement.setAttribute('data-theme', next);
     localStorage.setItem('channel_theme', next);
     el.themeToggle.innerHTML = next === 'dark' ? ICONS.sun : ICONS.moon;
+  });
+}
+
+function initBgPicker() {
+  const savedBg = localStorage.getItem(BG_STORAGE_KEY) || 'dots';
+  document.body.setAttribute('data-bg', savedBg);
+
+  if (!el.bgPicker) return;
+  el.bgPicker.querySelectorAll('[data-bg-choice]').forEach((btn) => {
+    btn.classList.toggle('active', btn.dataset.bgChoice === savedBg);
+  });
+
+  el.bgPicker.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-bg-choice]');
+    if (!btn) return;
+    const choice = btn.dataset.bgChoice;
+    document.body.setAttribute('data-bg', choice);
+    localStorage.setItem(BG_STORAGE_KEY, choice);
+    el.bgPicker.querySelectorAll('[data-bg-choice]').forEach((b) => {
+      b.classList.toggle('active', b === btn);
+    });
   });
 }
 
@@ -331,7 +355,7 @@ async function fetchLiveData() {
 
   if (postsRes.data) {
     state.posts = await resolveMediaUrls(postsRes.data);
-    renderFeed({ scrollToBottom: true });
+    renderFeed({ restoreScroll: !hasRestoredInitialScroll });
   }
 }
 
@@ -347,8 +371,6 @@ function renderHeader() {
   } else {
     el.channelAvatar.textContent = (state.settings.title || 'ה').trim().charAt(0);
   }
-
-  el.modeBadge.textContent = state.isDemo ? 'מצב הדגמה' : 'שידור חי';
 }
 
 function renderAuthUI() {
@@ -364,20 +386,15 @@ function renderAuthUI() {
   el.gateOrDivider.classList.toggle('hidden', state.isDemo);
   el.gateGoogleBtn.classList.toggle('hidden', state.isDemo);
 
+  if (el.profileEmail) {
+    el.profileEmail.textContent = state.user?.email || '—';
+  }
+
   if (state.isAdmin) {
-    el.authBtn.classList.add('hidden');
-    el.viewerLogoutBtn.classList.add('hidden');
     el.adminBar.classList.remove('hidden');
     el.adminSettingsBtn.classList.remove('hidden');
     el.adminEmailDisplay.textContent = state.user?.email || 'מנהל הדגמה';
-  } else if (isLoggedIn) {
-    el.authBtn.classList.add('hidden');
-    el.viewerLogoutBtn.classList.remove('hidden');
-    el.adminBar.classList.add('hidden');
-    el.adminSettingsBtn.classList.add('hidden');
   } else {
-    el.authBtn.classList.add('hidden');
-    el.viewerLogoutBtn.classList.add('hidden');
     el.adminBar.classList.add('hidden');
     el.adminSettingsBtn.classList.add('hidden');
   }
@@ -463,12 +480,34 @@ function renderMedia(post) {
 function scrollToFeedBottom(smooth = false) {
   window.scrollTo({
     top: document.documentElement.scrollHeight,
-    behavior: smooth ? 'smooth' : 'auto'
+    behavior: smooth ? 'smooth' : 'instant'
   });
+}
+
+function applyInitialScroll() {
+  hasRestoredInitialScroll = true;
+  if (window.location.hash.startsWith('#post-')) {
+    const target = document.getElementById(window.location.hash.slice(1));
+    if (target) {
+      target.scrollIntoView({ behavior: 'instant', block: 'center' });
+      return;
+    }
+  }
+  const savedY = localStorage.getItem(SCROLL_STORAGE_KEY);
+  if (savedY !== null && !Number.isNaN(Number(savedY))) {
+    window.scrollTo({ top: Number(savedY), behavior: 'instant' });
+  } else {
+    scrollToFeedBottom(false);
+  }
 }
 
 function renderFeed(options = {}) {
   renderPinnedBanner();
+
+  const shouldRestore = Boolean(options.restoreScroll && !hasRestoredInitialScroll);
+  if (shouldRestore) {
+    el.feedContainer.style.visibility = 'hidden';
+  }
 
   const q = state.searchQuery.trim().toLowerCase();
   const filtered = state.posts.filter((post) => {
@@ -483,6 +522,7 @@ function renderFeed(options = {}) {
 
   if (filtered.length === 0) {
     el.feedContainer.innerHTML = `<div class="empty-state">לא נמצאו הודעות תואמות.</div>`;
+    el.feedContainer.style.visibility = 'visible';
     return;
   }
 
@@ -547,14 +587,17 @@ function renderFeed(options = {}) {
   el.feedContainer.querySelectorAll('[data-content-wrap]').forEach((wrap) => {
     const contentEl = wrap.querySelector('.post-content');
     const btn = wrap.querySelector('.read-more-btn');
-    if (contentEl && btn && contentEl.scrollHeight > 175) {
+    if (contentEl && btn && contentEl.scrollHeight > 125) {
       wrap.classList.add('is-collapsed');
       btn.classList.remove('hidden');
     }
   });
 
-  if (options.scrollToBottom && !window.location.hash.startsWith('#post-')) {
-    requestAnimationFrame(() => scrollToFeedBottom(false));
+  if (shouldRestore) {
+    applyInitialScroll();
+    el.feedContainer.style.visibility = 'visible';
+  } else if (options.scrollToBottom && !window.location.hash.startsWith('#post-')) {
+    scrollToFeedBottom(false);
   }
 }
 
@@ -824,26 +867,31 @@ function bindEvents() {
     }
   });
 
+  // Hover/tap search toggle for touch devices
+  if (el.hoverSearchWrap) {
+    const trigger = el.hoverSearchWrap.querySelector('.hover-search-trigger');
+    trigger?.addEventListener('click', () => {
+      el.hoverSearchWrap.classList.toggle('is-open');
+      if (el.hoverSearchWrap.classList.contains('is-open')) {
+        el.searchInput.focus();
+      }
+    });
+    document.addEventListener('click', (e) => {
+      if (!el.hoverSearchWrap.contains(e.target)) {
+        el.hoverSearchWrap.classList.remove('is-open');
+      }
+    });
+  }
+
   // Gate Demo Mode
   el.gateDemoBtn.addEventListener('click', () => {
     state.user = { email: 'demo@admin.local' };
     state.isAdmin = true;
     renderAuthUI();
-    renderFeed({ scrollToBottom: true });
+    renderFeed({ restoreScroll: !hasRestoredInitialScroll });
   });
 
-  // Viewer Logout
-  el.viewerLogoutBtn.addEventListener('click', async () => {
-    if (state.isDemo) {
-      state.user = null;
-      state.isAdmin = false;
-      renderAuthUI();
-      return;
-    }
-    await state.supabase.auth.signOut();
-  });
-
-  // Logout (Admin)
+  // Logout (All users)
   el.logoutBtn.addEventListener('click', async () => {
     if (state.isDemo) {
       state.user = null;
@@ -965,19 +1013,26 @@ function bindEvents() {
     if (e.target === el.lightbox) closeLightbox();
   });
 
-  // Floating scroll-to-bottom button
+  // Floating scroll-to-bottom button & persistent scroll position
   el.scrollBottomBtn.addEventListener('click', () => scrollToFeedBottom(true));
+  let scrollSaveTimer = null;
   window.addEventListener('scroll', () => {
-    if (!state.user) return;
+    if (!state.user || !hasRestoredInitialScroll) return;
     const distanceFromBottom =
       document.documentElement.scrollHeight - (window.scrollY + window.innerHeight);
-    el.scrollBottomBtn.classList.toggle('hidden', distanceFromBottom < 260);
+    el.scrollBottomBtn.classList.toggle('hidden', distanceFromBottom < 220);
+
+    clearTimeout(scrollSaveTimer);
+    scrollSaveTimer = setTimeout(() => {
+      localStorage.setItem(SCROLL_STORAGE_KEY, String(Math.round(window.scrollY)));
+    }, 150);
   });
 }
 
 // --- Bootstrap ---
 async function init() {
   initTheme();
+  initBgPicker();
   renderCategories();
   bindEvents();
 
@@ -985,18 +1040,12 @@ async function init() {
     loadDemoData();
     renderHeader();
     renderAuthUI();
-    if (state.user) renderFeed();
+    if (state.user) renderFeed({ restoreScroll: true });
   } else {
     renderHeader();
     renderAuthUI();
     await initSupabase();
     await fetchLiveData();
-  }
-
-  // Deep link to specific post
-  if (window.location.hash.startsWith('#post-')) {
-    const target = document.getElementById(window.location.hash.slice(1));
-    if (target) target.scrollIntoView({ behavior: 'smooth' });
   }
 }
 

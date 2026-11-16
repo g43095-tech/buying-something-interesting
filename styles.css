@@ -1,6 +1,5 @@
 :root {
   --bg: #e7eef5;
-  --bg-pattern: radial-gradient(rgba(2, 132, 199, 0.08) 1.25px, transparent 1.25px);
   --surface: #ffffff;
   --surface-alt: #f4f7fb;
   --text: #0f172a;
@@ -13,13 +12,12 @@
   --success: #16a34a;
   --pinned-bg: #fffbeb;
   --pinned-border: #fde68a;
-  --shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
+  --shadow: 0 2px 10px rgba(15, 23, 42, 0.06);
   --radius: 16px;
 }
 
 [data-theme="dark"] {
   --bg: #0b141e;
-  --bg-pattern: radial-gradient(rgba(56, 189, 248, 0.08) 1.25px, transparent 1.25px);
   --surface: #172331;
   --surface-alt: #101924;
   --text: #f1f5f9;
@@ -32,7 +30,7 @@
   --success: #4ade80;
   --pinned-bg: rgba(245, 158, 11, 0.12);
   --pinned-border: rgba(245, 158, 11, 0.35);
-  --shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+  --shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
 }
 
 * {
@@ -43,11 +41,109 @@ body {
   margin: 0;
   font-family: 'Rubik', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   background-color: var(--bg);
-  background-image: var(--bg-pattern);
-  background-size: 22px 22px;
   color: var(--text);
   line-height: 1.6;
-  transition: background-color 0.2s ease, color 0.2s ease;
+  min-height: 100vh;
+  overflow-x: hidden;
+  transition: background-color 0.25s ease, color 0.25s ease;
+}
+
+/* --- רקעים מונפשים עדינים לבחירת המשתמש --- */
+.bg-ambient {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+/* 1. נקודות קלאסיות */
+body[data-bg="dots"] .bg-ambient {
+  background-image: radial-gradient(rgba(2, 132, 199, 0.11) 1.3px, transparent 1.3px);
+  background-size: 22px 22px;
+  animation: bgDrift 45s linear infinite;
+}
+
+[data-theme="dark"] body[data-bg="dots"] .bg-ambient {
+  background-image: radial-gradient(rgba(56, 189, 248, 0.1) 1.3px, transparent 1.3px);
+}
+
+/* 2. בועות צפות רכות */
+body[data-bg="bubbles"] .bg-ambient::before,
+body[data-bg="bubbles"] .bg-ambient::after {
+  content: "";
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(55px);
+  opacity: 0.45;
+  animation: floatBubble 16s ease-in-out infinite alternate;
+}
+
+body[data-bg="bubbles"] .bg-ambient::before {
+  width: 380px;
+  height: 380px;
+  background: radial-gradient(circle, rgba(56, 189, 248, 0.45), transparent 70%);
+  top: -80px;
+  right: 8%;
+}
+
+body[data-bg="bubbles"] .bg-ambient::after {
+  width: 420px;
+  height: 420px;
+  background: radial-gradient(circle, rgba(99, 102, 241, 0.35), transparent 70%);
+  bottom: -100px;
+  left: 6%;
+  animation-delay: -6s;
+}
+
+/* 3. נצנוץ כוכבים עדין */
+body[data-bg="stars"] .bg-ambient {
+  background-image:
+    radial-gradient(2px 2px at 20px 30px, rgba(2, 132, 199, 0.25), transparent),
+    radial-gradient(2px 2px at 90px 140px, rgba(99, 102, 241, 0.25), transparent),
+    radial-gradient(1.5px 1.5px at 160px 80px, rgba(14, 165, 233, 0.28), transparent);
+  background-size: 200px 200px;
+  animation: twinkleShift 10s ease-in-out infinite alternate;
+}
+
+[data-theme="dark"] body[data-bg="stars"] .bg-ambient {
+  background-image:
+    radial-gradient(2px 2px at 20px 30px, rgba(186, 230, 253, 0.35), transparent),
+    radial-gradient(2px 2px at 90px 140px, rgba(165, 180, 252, 0.3), transparent),
+    radial-gradient(1.5px 1.5px at 160px 80px, rgba(255, 255, 255, 0.3), transparent);
+}
+
+/* 4. גלים רגועים */
+body[data-bg="waves"] .bg-ambient {
+  background:
+    linear-gradient(125deg, rgba(2, 132, 199, 0.08) 0%, transparent 45%, rgba(99, 102, 241, 0.08) 100%);
+  background-size: 200% 200%;
+  animation: waveFlow 14s ease-in-out infinite alternate;
+}
+
+/* 5. נקי */
+body[data-bg="clean"] .bg-ambient {
+  background: none;
+}
+
+@keyframes bgDrift {
+  from { background-position: 0 0; }
+  to { background-position: 220px 220px; }
+}
+
+@keyframes floatBubble {
+  0% { transform: translate(0, 0) scale(1); }
+  100% { transform: translate(-35px, 45px) scale(1.12); }
+}
+
+@keyframes twinkleShift {
+  0% { opacity: 0.55; transform: translateY(0); }
+  100% { opacity: 1; transform: translateY(-10px); }
+}
+
+@keyframes waveFlow {
+  0% { background-position: 0% 50%; }
+  100% { background-position: 100% 50%; }
 }
 
 .icon-lg {
@@ -77,6 +173,7 @@ body {
 .btn-with-icon {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
 }
 
@@ -84,42 +181,55 @@ body {
   display: none !important;
 }
 
-.app-shell {
-  max-width: 780px;
+/* --- פריסת 3 עמודות (ימין: ערוץ/חיפוש/קטגוריות, מרכז: פיד צר, שמאל: פרופיל + פרסומת) --- */
+.app-layout {
+  max-width: 1320px;
   margin: 0 auto;
-  min-height: 100vh;
-  padding: 16px 14px 48px;
+  padding: 16px 18px 36px;
+  display: grid;
+  grid-template-columns: 270px minmax(0, 560px) minmax(270px, 1fr);
+  gap: 20px;
+  align-items: start;
 }
 
-/* Header */
-.channel-header {
+.sidebar {
+  position: sticky;
+  top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.sidebar-card {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 16px 18px;
+  padding: 16px;
   box-shadow: var(--shadow);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 14px;
-  flex-wrap: wrap;
 }
 
-.header-main {
+.sidebar-section-title {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-bottom: 10px;
+}
+
+/* לשונית ימין: מותג + חיפוש בריחוף */
+.brand-top {
   display: flex;
   align-items: center;
-  gap: 14px;
-  min-width: 0;
-  flex: 1;
+  gap: 11px;
+  position: relative;
 }
 
 .channel-avatar {
-  width: 54px;
-  height: 54px;
+  width: 46px;
+  height: 46px;
   border-radius: 50%;
   background: linear-gradient(135deg, var(--primary), #6366f1);
   color: #fff;
-  font-size: 1.4rem;
+  font-size: 1.25rem;
   font-weight: 700;
   display: grid;
   place-items: center;
@@ -135,40 +245,239 @@ body {
 
 .channel-meta {
   min-width: 0;
+  flex: 1;
 }
 
-.channel-title-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.channel-title-row h1 {
+.channel-meta h1 {
   margin: 0;
-  font-size: 1.25rem;
+  font-size: 1.15rem;
   font-weight: 700;
 }
 
-.badge-live {
-  font-size: 0.72rem;
-  font-weight: 600;
-  padding: 2px 8px;
-  border-radius: 999px;
-  background: var(--primary-soft);
-  color: var(--primary);
+.channel-desc {
+  margin: 2px 0 0;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  line-height: 1.4;
 }
 
-.channel-desc {
-  margin: 3px 0 0;
+/* אייקון חיפוש שנפתח בריחוף עכבר */
+.hover-search {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.hover-search-drawer {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  transform: translateY(-50%) scaleX(0.85);
+  transform-origin: left center;
+  opacity: 0;
+  pointer-events: none;
+  width: 215px;
+  z-index: 30;
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+
+.hover-search:hover .hover-search-drawer,
+.hover-search:focus-within .hover-search-drawer,
+.hover-search.is-open .hover-search-drawer {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(-50%) scaleX(1);
+}
+
+.hover-search-drawer input {
+  width: 100%;
+  padding: 9px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--primary);
+  background: var(--surface);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 0.88rem;
+  box-shadow: 0 8px 22px rgba(15, 23, 42, 0.15);
+}
+
+.hover-search-drawer input:focus {
+  outline: none;
+}
+
+/* קטגוריות אנכיות בצד ימין */
+.category-chips {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.chip {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text);
+  border-radius: 10px;
+  padding: 8px 12px;
+  font-family: inherit;
   font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  text-align: right;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.chip:hover {
+  background: var(--surface-alt);
+}
+
+.chip.active {
+  background: var(--primary-soft);
+  color: var(--primary);
+  border-color: var(--primary);
+}
+
+/* לשונית שמאל: פרופיל + מצב לילה + בחירת רקע + פרסומת */
+.profile-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.profile-user {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.profile-avatar-dot {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--primary-soft);
+  color: var(--primary);
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+
+.profile-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.profile-label {
+  font-size: 0.72rem;
   color: var(--text-muted);
 }
 
-.header-actions {
+.profile-email {
+  font-size: 0.84rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.profile-quick-actions {
   display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.bg-picker {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.bg-picker-label {
+  display: block;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+
+.bg-picker-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.bg-chip {
+  background: var(--surface-alt);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-family: inherit;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+
+.bg-chip.active {
+  background: var(--primary);
+  color: #fff;
+  border-color: var(--primary);
+}
+
+.profile-logout-btn {
+  margin-top: 14px;
+}
+
+/* מקום ייעודי למודעת פרסומת בצד שמאל */
+.ad-slot-card {
+  min-height: 360px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ad-badge {
+  align-self: flex-start;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: var(--surface-alt);
+  border: 1px solid var(--border);
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+
+.ad-placeholder-box {
+  flex: 1;
+  border: 1.5px dashed var(--border);
+  border-radius: 12px;
+  background: var(--surface-alt);
+  padding: 24px 18px;
+  display: flex;
+  flex-direction: column;
   align-items: center;
+  justify-content: center;
+  text-align: center;
   gap: 8px;
+  color: var(--text-muted);
+}
+
+.ad-icon {
+  color: var(--primary);
+  opacity: 0.8;
+}
+
+.ad-placeholder-box strong {
+  color: var(--text);
+  font-size: 0.95rem;
+}
+
+.ad-placeholder-box p {
+  margin: 0;
+  font-size: 0.82rem;
+}
+
+/* --- עמודת הפיד המרכזית (צרה ונוחה לקריאה) --- */
+.feed-column {
+  position: relative;
+  min-width: 0;
 }
 
 /* Buttons */
@@ -177,7 +486,7 @@ body {
   border-radius: 10px;
   padding: 8px 14px;
   font-family: inherit;
-  font-size: 0.9rem;
+  font-size: 0.88rem;
   font-weight: 500;
   cursor: pointer;
   transition: all 0.15s ease;
@@ -226,122 +535,53 @@ body {
   display: grid;
   place-items: center;
   cursor: pointer;
-  font-size: 1rem;
 }
 
 .icon-btn:hover {
   border-color: var(--primary);
+  color: var(--primary);
 }
 
 /* Admin Bar */
 .admin-bar {
-  margin-top: 12px;
-  background: var(--primary-soft);
+  margin-bottom: 12px;
+  background: var(--surface);
   border: 1px solid var(--primary);
   border-radius: var(--radius);
-  padding: 10px 16px;
+  padding: 10px 14px;
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 10px;
-  flex-wrap: wrap;
-  font-size: 0.9rem;
-}
-
-.admin-bar-actions {
-  display: flex;
-  gap: 8px;
-}
-
-/* Toolbar */
-.toolbar {
-  margin-top: 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.search-box {
-  position: relative;
-  display: flex;
-  align-items: center;
-}
-
-.search-icon {
-  position: absolute;
-  right: 12px;
-  pointer-events: none;
-  color: var(--text-muted);
-  display: inline-flex;
-  align-items: center;
-}
-
-.search-box input {
-  width: 100%;
-  padding: 10px 38px 10px 14px;
-  border-radius: 12px;
-  border: 1px solid var(--border);
-  background: var(--surface);
-  color: var(--text);
-  font-family: inherit;
-  font-size: 0.95rem;
-}
-
-.search-box input:focus {
-  outline: 2px solid var(--primary);
-  border-color: transparent;
-}
-
-.category-chips {
-  display: flex;
-  gap: 8px;
-  overflow-x: auto;
-  padding-bottom: 4px;
-}
-
-.chip {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  color: var(--text-muted);
-  border-radius: 999px;
-  padding: 5px 14px;
-  font-family: inherit;
-  font-size: 0.85rem;
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-.chip.active {
-  background: var(--primary);
-  color: #fff;
-  border-color: var(--primary);
+  font-size: 0.88rem;
+  box-shadow: var(--shadow);
 }
 
 /* Pinned Banner */
 .pinned-banner {
-  margin-top: 12px;
+  margin-bottom: 12px;
   background: var(--pinned-bg);
   border: 1px solid var(--pinned-border);
   border-radius: var(--radius);
-  padding: 10px 14px;
+  padding: 9px 14px;
   display: flex;
   align-items: center;
   gap: 10px;
-  flex-wrap: wrap;
 }
 
 .pinned-label {
   font-weight: 600;
-  font-size: 0.85rem;
+  font-size: 0.82rem;
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 4px;
   color: #b45309;
+  flex-shrink: 0;
 }
 
 .pinned-text {
   flex: 1;
-  font-size: 0.88rem;
+  font-size: 0.86rem;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -354,19 +594,20 @@ body {
   font-family: inherit;
   font-weight: 600;
   cursor: pointer;
-  font-size: 0.85rem;
+  font-size: 0.84rem;
 }
 
 /* Auth Gate */
 .auth-gate {
-  margin-top: 24px;
-  display: flex;
-  justify-content: center;
+  min-height: 100vh;
+  padding: 24px 16px;
+  display: grid;
+  place-items: center;
 }
 
 .auth-gate-card {
   width: 100%;
-  max-width: 430px;
+  max-width: 420px;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 20px;
@@ -418,7 +659,6 @@ body {
   padding: 8px;
   border-radius: 9px;
   cursor: pointer;
-  transition: all 0.15s ease;
 }
 
 .auth-tab.active {
@@ -441,15 +681,15 @@ body {
 .day-divider {
   display: flex;
   justify-content: center;
-  margin: 8px 0 2px;
+  margin: 6px 0 2px;
 }
 
 .day-divider span {
   background: rgba(15, 23, 42, 0.55);
   color: #ffffff;
-  font-size: 0.78rem;
+  font-size: 0.76rem;
   font-weight: 500;
-  padding: 4px 14px;
+  padding: 3px 13px;
   border-radius: 999px;
   backdrop-filter: blur(4px);
 }
@@ -461,7 +701,6 @@ body {
 
 /* Feed */
 .feed-container {
-  margin-top: 16px;
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -483,14 +722,14 @@ body {
   border: 1px solid var(--border);
   border-radius: 16px;
   border-top-right-radius: 4px;
-  padding: 14px 18px;
+  padding: 13px 16px;
   margin-right: 10px;
-  max-height: calc(100dvh - 96px);
+  max-height: calc(100dvh - 44px);
   display: flex;
   flex-direction: column;
   overflow: hidden;
   box-shadow: var(--shadow);
-  transition: transform 0.15s ease, border-color 0.2s ease;
+  transition: border-color 0.2s ease;
 }
 
 .post-card::before {
@@ -514,8 +753,9 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 10px;
-  margin-bottom: 10px;
+  gap: 8px;
+  margin-bottom: 8px;
+  flex-shrink: 0;
 }
 
 .post-meta {
@@ -523,7 +763,7 @@ body {
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
-  font-size: 0.8rem;
+  font-size: 0.78rem;
   color: var(--text-muted);
 }
 
@@ -554,7 +794,7 @@ body {
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 3px 8px;
-  font-size: 0.78rem;
+  font-size: 0.76rem;
   cursor: pointer;
   color: var(--text-muted);
   font-family: inherit;
@@ -572,10 +812,11 @@ body {
 
 .post-content-wrap {
   position: relative;
+  flex-shrink: 0;
 }
 
 .post-content-wrap.is-collapsed .post-content {
-  max-height: 170px;
+  max-height: 120px;
   overflow: hidden;
 }
 
@@ -585,20 +826,20 @@ body {
   left: 0;
   right: 0;
   bottom: 28px;
-  height: 48px;
+  height: 42px;
   background: linear-gradient(to bottom, transparent, var(--surface));
   pointer-events: none;
 }
 
 .read-more-btn {
-  margin-top: 6px;
+  margin-top: 5px;
   background: var(--primary-soft);
   color: var(--primary);
   border: none;
   border-radius: 8px;
   padding: 4px 12px;
   font-family: inherit;
-  font-size: 0.84rem;
+  font-size: 0.82rem;
   font-weight: 600;
   cursor: pointer;
 }
@@ -609,7 +850,7 @@ body {
 }
 
 .post-content {
-  font-size: 0.98rem;
+  font-size: 0.94rem;
   white-space: pre-wrap;
   word-break: break-word;
 }
@@ -619,35 +860,30 @@ body {
   text-decoration: underline;
 }
 
+/* חלונית מדיה מוגדלת ללא שוליים מיותרים + כפתור מסך מלא בפינה השמאלית העליונה */
 .post-media {
   margin-top: 10px;
+  min-height: 0;
   display: flex;
-  flex-direction: column;
-  align-items: center;
+  justify-content: center;
 }
 
 .media-frame {
   position: relative;
   width: 100%;
-  background: var(--surface-alt);
-  border: 1px solid var(--border);
   border-radius: 12px;
-  padding: 8px;
+  overflow: hidden;
+  background: #0b1120;
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 8px;
 }
 
 .media-frame img,
 .media-frame video {
-  max-width: 100%;
-  max-height: 40dvh;
-  width: auto;
-  height: auto;
+  width: 100%;
+  max-height: 58dvh;
   object-fit: contain;
-  border-radius: 8px;
   display: block;
 }
 
@@ -656,55 +892,35 @@ body {
 }
 
 .media-fullscreen-btn {
-  align-self: flex-end;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  color: var(--text);
-  border-radius: 8px;
-  padding: 4px 10px;
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 5;
+  background: rgba(15, 23, 42, 0.72);
+  backdrop-filter: blur(6px);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  color: #ffffff;
+  border-radius: 9px;
+  padding: 5px 10px;
   font-family: inherit;
-  font-size: 0.78rem;
+  font-size: 0.76rem;
   font-weight: 500;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
   gap: 5px;
+  transition: background 0.15s ease, transform 0.15s ease;
 }
 
 .media-fullscreen-btn:hover {
+  background: var(--primary);
   border-color: var(--primary);
-  color: var(--primary);
 }
 
 .post-media audio {
   width: 100%;
   border-radius: 10px;
   outline: none;
-}
-
-/* Scroll to bottom floating button */
-.scroll-bottom-btn {
-  position: fixed;
-  bottom: 22px;
-  left: 22px;
-  z-index: 900;
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
-  border: 1px solid var(--border);
-  background: var(--surface);
-  color: var(--primary);
-  box-shadow: 0 6px 20px rgba(15, 23, 42, 0.18);
-  display: grid;
-  place-items: center;
-  cursor: pointer;
-  transition: transform 0.15s ease, background 0.15s ease;
-}
-
-.scroll-bottom-btn:hover {
-  transform: translateY(2px);
-  background: var(--primary);
-  color: #fff;
 }
 
 .file-attachment {
@@ -718,7 +934,7 @@ body {
   color: var(--text);
   text-decoration: none;
   font-weight: 500;
-  font-size: 0.9rem;
+  font-size: 0.88rem;
 }
 
 .file-attachment:hover {
@@ -726,14 +942,15 @@ body {
 }
 
 .post-footer {
-  margin-top: 14px;
-  padding-top: 10px;
+  margin-top: 10px;
+  padding-top: 9px;
   border-top: 1px solid var(--border);
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   flex-wrap: wrap;
+  flex-shrink: 0;
 }
 
 .reactions-row {
@@ -746,8 +963,8 @@ body {
   background: var(--surface-alt);
   border: 1px solid var(--border);
   border-radius: 999px;
-  padding: 4px 10px;
-  font-size: 0.85rem;
+  padding: 3px 9px;
+  font-size: 0.82rem;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
@@ -765,13 +982,45 @@ body {
   background: transparent;
   border: none;
   color: var(--text-muted);
-  font-size: 0.82rem;
+  font-size: 0.8rem;
   cursor: pointer;
   font-family: inherit;
 }
 
 .share-btn:hover {
   color: var(--primary);
+}
+
+/* כפתור חץ צמוד לעמודת ההודעות */
+.scroll-bottom-anchor {
+  position: sticky;
+  bottom: 18px;
+  display: flex;
+  justify-content: flex-end;
+  pointer-events: none;
+  margin-top: 10px;
+  z-index: 40;
+}
+
+.scroll-bottom-btn {
+  pointer-events: auto;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--primary);
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.2);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+
+.scroll-bottom-btn:hover {
+  transform: translateY(2px);
+  background: var(--primary);
+  color: #fff;
 }
 
 /* Modals */
@@ -819,7 +1068,7 @@ body {
 
 .modal-header h2 {
   margin: 0;
-  font-size: 1.1rem;
+  font-size: 1.08rem;
 }
 
 .modal-body {
@@ -931,7 +1180,7 @@ body {
   position: fixed;
   inset: 0;
   z-index: 2000;
-  background: rgba(0, 0, 0, 0.88);
+  background: rgba(0, 0, 0, 0.9);
   display: grid;
   place-items: center;
   padding: 20px;
@@ -949,12 +1198,39 @@ body {
   position: absolute;
   top: 16px;
   left: 16px;
-  background: rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.16);
   color: #fff;
   border: none;
   width: 40px;
   height: 40px;
   border-radius: 50%;
-  font-size: 1.2rem;
+  display: grid;
+  place-items: center;
   cursor: pointer;
+}
+
+/* --- רספונסיביות למסכים צרים / מובייל --- */
+@media (max-width: 980px) {
+  .app-layout {
+    grid-template-columns: 1fr;
+    max-width: 600px;
+    gap: 12px;
+  }
+
+  .sidebar {
+    position: static;
+  }
+
+  .category-chips {
+    flex-direction: row;
+    overflow-x: auto;
+  }
+
+  .chip {
+    white-space: nowrap;
+  }
+
+  .ad-slot-card {
+    min-height: 160px;
+  }
 }
