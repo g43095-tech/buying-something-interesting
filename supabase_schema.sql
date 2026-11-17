@@ -62,11 +62,17 @@ CREATE TABLE IF NOT EXISTS public.posts (
   media_url TEXT DEFAULT '',
   media_name TEXT DEFAULT '',
   category TEXT DEFAULT 'כללי',
+  external_id TEXT,
   is_pinned BOOLEAN NOT NULL DEFAULT FALSE,
   reactions JSONB NOT NULL DEFAULT '{"👍": 0, "❤️": 0, "🔥": 0}'::jsonb,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+ALTER TABLE public.posts ADD COLUMN IF NOT EXISTS external_id TEXT;
+DROP INDEX IF EXISTS idx_posts_external_id_unique;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_posts_external_id_unique
+  ON public.posts (external_id);
 
 ALTER TABLE public.posts ENABLE ROW LEVEL SECURITY;
 

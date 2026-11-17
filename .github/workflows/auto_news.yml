@@ -1,0 +1,33 @@
+name: Auto News Fetcher
+
+on:
+  schedule:
+    # רץ בחינם לגמרי כל 10 דקות (GitHub Actions על ריפו ציבורי - ללא עלות וללא כרטיס אשראי)
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: auto-news-fetcher
+  cancel-in-progress: false
+
+jobs:
+  fetch-and-publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Fetch filtered news and publish to Supabase
+        env:
+          SUPABASE_URL: 'https://sqqghfcdgswvwvbiulwk.supabase.co'
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+          NEWS_CATEGORY: 'חדשות'
+          NEWS_MAX_AGE_HOURS: '12'
+          NEWS_MAX_POSTS_PER_RUN: '10'
+          NEWS_INCLUDE_LINK: 'false'
+        run: node scripts/fetch_news.mjs
