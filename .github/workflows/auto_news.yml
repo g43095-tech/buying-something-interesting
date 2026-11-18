@@ -14,15 +14,35 @@ jobs:
   fetch-and-publish:
     runs-on: ubuntu-latest
     steps:
+      - name: Check configuration
+        id: check
+        env:
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+        run: |
+          if [ -z "$SUPABASE_SECRET_KEY" ]; then
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            if [ "${{ github.event_name }}" = "schedule" ]; then
+              echo "::notice::SUPABASE_SECRET_KEY is not set in repository secrets yet; skipping scheduled run cleanly."
+            else
+              echo "::error::Missing SUPABASE_SECRET_KEY secret in GitHub Settings -> Secrets and variables -> Actions."
+              exit 1
+            fi
+          else
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Checkout repository
+        if: steps.check.outputs.configured == 'true'
         uses: actions/checkout@v4
 
       - name: Setup Node.js
+        if: steps.check.outputs.configured == 'true'
         uses: actions/setup-node@v4
         with:
           node-version: '20'
 
       - name: Fetch filtered news and publish to Supabase
+        if: steps.check.outputs.configured == 'true'
         env:
           SUPABASE_URL: 'https://sqqghfcdgswvwvbiulwk.supabase.co'
           SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
