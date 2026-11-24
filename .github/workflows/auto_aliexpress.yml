@@ -1,0 +1,39 @@
+name: Auto AliExpress Deals
+
+on:
+  schedule:
+    # 5 ריצות ביום (08:00, 11:00, 14:00, 17:00, 20:00 שעון ישראל) × 2 מוצרים = 10 דילים ביום
+    - cron: '0 6,9,12,15,18 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: auto-aliexpress-deals
+  cancel-in-progress: false
+
+jobs:
+  fetch-and-publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Fetch filtered AliExpress deals and publish to Supabase
+        env:
+          SUPABASE_URL: 'https://sqqghfcdgswvwvbiulwk.supabase.co'
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+          ALIEXPRESS_APP_KEY: ${{ secrets.ALIEXPRESS_APP_KEY }}
+          ALIEXPRESS_APP_SECRET: ${{ secrets.ALIEXPRESS_APP_SECRET }}
+          ALIEXPRESS_TRACKING_ID: 'levtov'
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          ALIEXPRESS_CATEGORY: 'דילים'
+          ALIEXPRESS_POSTS_PER_RUN: '2'
+          ALIEXPRESS_MIN_SALES: '50'
+          ALIEXPRESS_MIN_RATING_PCT: '90'
+          ALIEXPRESS_MIN_PRICE_ILS: '15'
+          ALIEXPRESS_MAX_PRICE_ILS: '450'
+        run: node scripts/fetch_aliexpress.mjs
