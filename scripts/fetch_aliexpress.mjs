@@ -14,6 +14,7 @@ const CATEGORY = process.env.ALIEXPRESS_CATEGORY || 'דילים';
 const POSTS_PER_RUN = Number(process.env.ALIEXPRESS_POSTS_PER_RUN || 2);
 const MIN_SALES = Number(process.env.ALIEXPRESS_MIN_SALES || 50);
 const MIN_RATING_PCT = Number(process.env.ALIEXPRESS_MIN_RATING_PCT || 90);
+const MIN_COMMISSION_PCT = Number(process.env.ALIEXPRESS_MIN_COMMISSION_PCT || 5);
 const MIN_PRICE_ILS = Number(process.env.ALIEXPRESS_MIN_PRICE_ILS || 15);
 const MAX_PRICE_ILS = Number(process.env.ALIEXPRESS_MAX_PRICE_ILS || 450);
 const DRY_RUN = String(process.env.DRY_RUN || '0') === '1';
@@ -84,6 +85,7 @@ async function queryAliExpressProducts(keywords, pageNo = 1) {
     page_no: String(pageNo),
     page_size: '20',
     sort: 'LAST_VOLUME_DESC',
+    ship_to_country: 'IL',
     target_currency: 'ILS',
     target_language: 'EN'
   };
@@ -124,6 +126,12 @@ function parseDiscount(raw) {
   return Number.isFinite(num) ? num : 0;
 }
 
+function parseCommissionPercent(p) {
+  const base = Number.parseFloat(String(p?.commission_rate || '0').replace('%', '').trim()) || 0;
+  const hot = Number.parseFloat(String(p?.hot_product_commission_rate || '0').replace('%', '').trim()) || 0;
+  return Math.max(base, hot);
+}
+
 function isGoodProduct(p) {
   if (!p?.product_id || !p?.product_title || !p?.promotion_link || !p?.product_main_image_url) {
     return false;
@@ -149,6 +157,11 @@ function isGoodProduct(p) {
     return false;
   }
 
+  const commissionPct = parseCommissionPercent(p);
+  if (commissionPct < MIN_COMMISSION_PCT) {
+    return false;
+  }
+
   return true;
 }
 
@@ -156,7 +169,8 @@ function scoreProduct(p) {
   const sales = Number(p.lastest_volume || 0);
   const ratingPct = parseRatingPercent(p.evaluate_rate) || 92;
   const discount = parseDiscount(p.discount);
-  return Math.log10(Math.max(10, sales)) * 30 + (ratingPct - 85) * 3 + discount * 0.5;
+  const commissionPct = parseCommissionPercent(p);
+  return Math.log10(Math.max(10, sales)) * 30 + (ratingPct - 85) * 3 + discount * 0.5 + commissionPct * 8;
 }
 
 async function generateHebrewCopyWithGemini(product) {

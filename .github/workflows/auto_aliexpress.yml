@@ -34,6 +34,7 @@ jobs:
           ALIEXPRESS_POSTS_PER_RUN: '2'
           ALIEXPRESS_MIN_SALES: '50'
           ALIEXPRESS_MIN_RATING_PCT: '90'
+          ALIEXPRESS_MIN_COMMISSION_PCT: '5'
           ALIEXPRESS_MIN_PRICE_ILS: '15'
           ALIEXPRESS_MAX_PRICE_ILS: '450'
         run: node scripts/fetch_aliexpress.mjs
