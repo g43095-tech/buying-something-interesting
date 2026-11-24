@@ -8,7 +8,7 @@ const ALIEXPRESS_APP_SECRET = (process.env.ALIEXPRESS_APP_SECRET || '').trim();
 const ALIEXPRESS_TRACKING_ID = (process.env.ALIEXPRESS_TRACKING_ID || 'levtov').trim();
 
 const GEMINI_API_KEY = (process.env.GEMINI_API_KEY || '').trim();
-const GEMINI_MODELS = ['gemini-3.1-flash-lite', 'gemini-flash-lite-latest', 'gemini-flash-latest'];
+const GEMINI_MODELS = ['gemini-3.1-flash-lite', 'gemini-3.8-flash', 'gemini-flash-lite-latest'];
 
 const CATEGORY = process.env.ALIEXPRESS_CATEGORY || 'דילים';
 const POSTS_PER_RUN = Number(process.env.ALIEXPRESS_POSTS_PER_RUN || 2);
@@ -227,10 +227,16 @@ async function generateHebrewCopyWithGemini(product) {
   return null;
 }
 
+function normalizeUrl(url) {
+  const s = String(url || '').trim();
+  if (!s) return '';
+  return s.startsWith('//') ? `https:${s}` : s;
+}
+
 async function buildPostRecord(product) {
   const aiCopy = await generateHebrewCopyWithGemini(product);
-  const title = aiCopy?.title || `🔥 ${product.product_title.slice(0, 75)}`;
-  const description = aiCopy?.description || 'מוצר מומלץ ומבוקש במיוחד מאליאקספרס עם ביקורות מצוינות!';
+  const title = aiCopy?.title || '🔥 גאדג׳ט מומלץ ומבוקש לבית מאליאקספרס';
+  const description = aiCopy?.description || 'מוצר מומלץ ומבוקש במיוחד מאליאקספרס עם ביקורות מצוינות ומשלוח לישראל!';
 
   const salePrice = parsePrice(product.target_sale_price).toFixed(0);
   const origPrice = parsePrice(product.target_original_price).toFixed(0);
@@ -259,7 +265,7 @@ async function buildPostRecord(product) {
     external_id: `aliexpress:${product.product_id}`,
     content,
     media_type: 'image',
-    media_url: product.product_main_image_url,
+    media_url: normalizeUrl(product.product_main_image_url),
     media_name: `${product.product_id}.jpg`,
     category: CATEGORY,
     is_pinned: false,
