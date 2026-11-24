@@ -309,7 +309,7 @@ async function main() {
       console.log(`[AliExpress] "${q}" (page ${pageNo}): fetched ${items.length} items`);
       for (const p of items) {
         if (isGoodProduct(p) && !byId.has(String(p.product_id))) {
-          byId.set(String(p.product_id), p);
+          byId.set(String(p.product_id), { ...p, _query: q });
         }
       }
     } catch (err) {
@@ -324,7 +324,22 @@ async function main() {
 
   console.log(`Filtered quality candidates: ${candidates.length}`);
 
-  const selected = candidates.slice(0, POSTS_PER_RUN);
+  // בחירת מוצר אחד מקסימום מכל שאילתת חיפוש כדי לשמור על גיוון ולא להעלות שני מוצרים דומים
+  const selected = [];
+  const usedQueries = new Set();
+  for (const p of candidates) {
+    if (selected.length >= POSTS_PER_RUN) break;
+    if (usedQueries.has(p._query)) continue;
+    usedQueries.add(p._query);
+    selected.push(p);
+  }
+  // אם חסרים מוצרים בגלל גיוון, משלימים מהמועמדים הנותרים
+  if (selected.length < POSTS_PER_RUN) {
+    for (const p of candidates) {
+      if (selected.length >= POSTS_PER_RUN) break;
+      if (!selected.includes(p)) selected.push(p);
+    }
+  }
   if (!selected.length) {
     console.log('No new qualifying AliExpress products found.');
     return;
