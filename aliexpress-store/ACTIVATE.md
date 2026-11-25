@@ -7,7 +7,8 @@
 - **שם החנות בממשק:** „המדף” (המותג מופיע רק בתוכן, לא בכתובת האתר).
 - **Supabase:** פרויקט `louxyixmnftfqcfjkxsz` — הסכמה, ההרשאות, המנהל ומשתמש הכניסה כבר קיימים. ה-Site URL וה-Redirect URLs עודכנו לכתובת החדשה.
 - **GitHub:** <https://github.com/g43095-tech/buying-something-interesting> — הקוד, הסוד `SUPABASE_SECRET_KEY`, המשתנה `SHOP_SITE_URL` והפריסה האוטומטית (GitHub Pages) פעילים.
-- **מה חסר כדי להתחיל לקבל מוצרים:** `ALIEXPRESS_APP_KEY`, `ALIEXPRESS_APP_SECRET`, `ALIEXPRESS_TRACKING_ID` ו-`GEMINI_API_KEY` כסודות במאגר. בלי הם הריצה מדלגת על השליפה והאתר נבנה ריק אבל תקין.
+- **הסודות מוגדרים:** `SUPABASE_SECRET_KEY`, `ALIEXPRESS_APP_KEY`, `ALIEXPRESS_APP_SECRET`, `ALIEXPRESS_TRACKING_ID` (`levtov`), `GEMINI_API_KEY` — נבדקו מול AliExpress (`Call succeeds`) ומול Gemini (200).
+- **סטטוס קטלוג:** הריצה הראשונה הכניסה 8 מוצרים עם כותרות ותיאורים בעברית שנכתבו ב-AI. מוצר אחד אושר לבדיקת פרסום, והיתר ממתינים לאישור שלך בפאנל.
 
 > **חשוב — שם האתר מול AliExpress:** בטפסי תוכנית השותפים אסור שכתובת האתר תכיל שמות מותג של עליבאבא (`ali`, `aliexpress`, `alibaba`, `taobao`). לכן שם המאגר והכתובת הם `buying-something-interesting`. אם משנים שוב את שם המאגר — חייבים לעדכן באותו רגע גם את `SHOP_SITE_URL`, את ה-Site URL / Redirect URLs ב-Supabase, ואת הקישורים במסמכים.
 
