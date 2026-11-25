@@ -162,6 +162,12 @@ jobs:
         with:
           path: aliexpress-store
 
+      # GitHub sometimes publishes the run's artifact a few seconds after the
+      # upload step finishes; deploy-pages then fails without retrying.
+      - name: Wait for the Pages artifact to be registered
+        if: steps.check.outputs.configured == 'true'
+        run: sleep 30
+
       - name: Deploy to GitHub Pages
         if: steps.check.outputs.configured == 'true'
         id: deployment
