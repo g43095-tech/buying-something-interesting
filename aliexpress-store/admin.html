@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ניהול החנות — המדף</title>
+  <meta name="robots" content="noindex, nofollow" />
+  <meta name="theme-color" content="#fffdf8" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%231d1b15'/><path d='M9 20h14M9 15h14' stroke='%23f6f4ef' stroke-width='2.4' stroke-linecap='round'/></svg>" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Frank+Ruhl+Libre:wght@500;700&family=Heebo:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="assets/store.css?v=20261124g" />
+</head>
+<body class="admin-page">
+  <!-- מסך כניסה -->
+  <div class="admin-gate" id="authGate">
+    <div class="gate-card">
+      <a class="brand" href="index.html"><span class="mark" aria-hidden="true"></span>המדף</a>
+      <p class="brand-sub">ניהול החנות</p>
+
+      <form id="loginForm">
+        <div class="field">
+          <label for="loginEmail">אימייל</label>
+          <input type="email" id="loginEmail" autocomplete="email" required />
+        </div>
+        <div class="field">
+          <label for="loginPassword">סיסמה</label>
+          <input type="password" id="loginPassword" autocomplete="current-password" minlength="6" required />
+        </div>
+        <button type="submit" class="btn btn-primary btn-full" id="loginBtn">כניסה</button>
+        <p class="form-msg" id="loginMsg"></p>
+      </form>
+
+      <a class="gate-back" href="index.html">← חזרה לחנות</a>
+    </div>
+  </div>
+
+  <!-- ממשק הניהול -->
+  <div class="hidden" id="adminApp">
+    <header class="topbar">
+      <button type="button" class="icon-btn menu-btn" id="menuBtn" aria-label="פתיחת התפריט">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+      </button>
+      <div class="search">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.2-3.2"/></svg>
+        <input type="search" id="adminSearch" placeholder="חיפוש בתור" aria-label="חיפוש מוצרים" />
+      </div>
+      <div class="topbar-actions">
+        <a class="top-action" href="index.html">לחנות</a>
+        <button type="button" class="account-btn" id="logoutBtn" title="התנתקות">
+          <span class="avatar" aria-hidden="true">א</span>
+          <span class="label" id="adminEmail">—</span>
+        </button>
+      </div>
+    </header>
+
+    <aside class="sidebar" id="sidebar">
+      <a class="brand" href="admin.html"><span class="mark" aria-hidden="true"></span>המדף</a>
+      <p class="brand-sub">ניהול החנות</p>
+      <nav class="nav" aria-label="מסכי ניהול">
+        <button type="button" class="nav-item active" data-tab="pending">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l2.5 2"/></svg>
+          ממתינים לאישור
+        </button>
+        <button type="button" class="nav-item" data-tab="approved">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>
+          מאושרים באתר
+        </button>
+        <button type="button" class="nav-item" data-tab="removed">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M5 8h14M9 8V6h6v2M7 8l1 12h8l1-12"/></svg>
+          הוסרו אוטומטית
+        </button>
+        <button type="button" class="nav-item" data-tab="rejected">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="m7 7 10 10M17 7 7 17"/></svg>
+          נדחו
+        </button>
+        <button type="button" class="nav-item" data-tab="insights">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M5 19V10M12 19V5M19 19v-6"/></svg>
+          נתונים ולוג
+        </button>
+      </nav>
+      <div class="side-foot">
+        <p>מוצרים חדשים מגיעים לכאן אוטומטית. רק מוצר שאושר מופיע בחנות.</p>
+        <a class="side-admin" href="index.html">מעבר לחנות</a>
+      </div>
+    </aside>
+
+    <div class="scrim" id="scrim" aria-hidden="true"></div>
+
+    <main class="admin-wrap" id="main">
+      <div class="page-head">
+        <div>
+          <h1 id="tabTitle">ממתינים לאישור</h1>
+          <p class="page-sub" id="tabSub"></p>
+          <p class="page-sub hidden" id="demoNote"></p>
+        </div>
+        <button type="button" class="btn" id="approveAllBtn">אישור כל הממתינים</button>
+      </div>
+
+      <div class="stats" id="stats"></div>
+
+      <div class="review-list" id="reviewList" aria-live="polite"></div>
+      <div class="empty hidden" id="empty">אין מוצרים להצגה כאן.</div>
+      <section class="insights hidden" id="insightsPanel" aria-label="נתוני החנות"></section>
+    </main>
+
+    <!-- עריכת מוצר -->
+    <div class="overlay hidden" id="editModal">
+      <div class="modal" role="dialog" aria-modal="true" aria-labelledby="editTitle">
+        <div class="modal-head">
+          <h2 id="editTitle">עריכת מוצר</h2>
+          <button type="button" class="modal-close" data-close="editModal" aria-label="סגירה">×</button>
+        </div>
+        <div class="account-body">
+          <form id="editForm">
+            <input type="hidden" id="editId" />
+            <div class="field">
+              <label for="editName">כותרת</label>
+              <input type="text" id="editName" required maxlength="120" />
+            </div>
+            <div class="field">
+              <label for="editDesc">תיאור</label>
+              <textarea id="editDesc" maxlength="600"></textarea>
+            </div>
+            <div class="field">
+              <label for="editWhy">למה בחרנו בזה</label>
+              <textarea id="editWhy" maxlength="300"></textarea>
+            </div>
+            <div class="ai-row">
+              <button type="button" class="btn btn-sm" id="aiRewriteBtn">שכתוב כותרת ותיאור עם AI</button>
+              <span class="form-msg" id="aiMsg"></span>
+            </div>
+            <div class="field-row">
+              <div class="field">
+                <label for="editCategory">קטגוריה</label>
+                <select id="editCategory"></select>
+              </div>
+              <div class="field">
+                <label for="editPrice">מחיר (₪)</label>
+                <input type="number" id="editPrice" min="0" step="0.01" />
+              </div>
+            </div>
+            <div class="field-row">
+              <div class="field">
+                <label for="editOriginal">מחיר מקורי (₪)</label>
+                <input type="number" id="editOriginal" min="0" step="0.01" />
+              </div>
+              <div class="field">
+                <label for="editImage">כתובת תמונה</label>
+                <input type="url" id="editImage" />
+              </div>
+            </div>
+            <div class="field">
+              <label for="editLink">קישור שותפים</label>
+              <input type="url" id="editLink" required />
+            </div>
+            <div class="account-actions">
+              <button type="submit" class="btn btn-primary" id="saveEditBtn">שמירה</button>
+              <button type="button" class="btn" data-close="editModal">ביטול</button>
+            </div>
+            <p class="form-msg" id="editMsg"></p>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast-host" id="toastHost" aria-live="polite"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js" defer></script>
+  <script src="config.js?v=20261124g" defer></script>
+  <script src="assets/admin.js?v=20261124g" defer></script>
+</body>
+</html>

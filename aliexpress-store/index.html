@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>המדף — מוצרים נבחרים מאליאקספרס</title>
+  <meta name="description" content="מוצרים נבחרים מאליאקספרס: גאדג׳טים, בית ומטבח, ארגון ועוד. מחירים מעודכנים וקישור ישיר לרכישה." />
+  <meta name="theme-color" content="#fffdf8" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%231d1b15'/><path d='M9 20h14M9 15h14' stroke='%23f6f4ef' stroke-width='2.4' stroke-linecap='round'/></svg>" />
+  <link rel="preconnect" href="https://sqqghfcdgswvwvbiulwk.supabase.co" crossorigin />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Frank+Ruhl+Libre:wght@500;700&family=Heebo:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="assets/store.css?v=20261124g" />
+</head>
+<body>
+  <a class="skip-link" href="#main">דילוג לתוכן</a>
+
+  <header class="topbar">
+    <button type="button" class="icon-btn menu-btn" id="menuBtn" aria-label="פתיחת התפריט">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+    </button>
+
+    <div class="search">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.2-3.2"/></svg>
+      <input type="search" id="searchInput" placeholder="חיפוש מוצר" aria-label="חיפוש מוצר" autocomplete="off" />
+    </div>
+
+    <div class="topbar-actions">
+      <button type="button" class="top-action" id="favBtn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M12 20s-7-4.3-7-9a4 4 0 0 1 7-2.6A4 4 0 0 1 19 11c0 4.7-7 9-7 9Z"/></svg>
+        <span>שמורים</span>
+        <span class="count" id="favCount">0</span>
+      </button>
+      <button type="button" class="account-btn" id="accountBtn" aria-haspopup="dialog">
+        <span class="avatar" id="accountAvatar" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="8" r="3.4"/><path d="M5.5 19c.6-3.2 3.3-5 6.5-5s5.9 1.8 6.5 5"/></svg>
+        </span>
+        <span class="label" id="accountLabel">כניסה</span>
+      </button>
+    </div>
+  </header>
+
+  <aside class="sidebar" id="sidebar">
+    <a class="brand" href="index.html"><span class="mark" aria-hidden="true"></span>המדף</a>
+    <p class="brand-sub">מוצרים נבחרים מאליאקספרס</p>
+
+    <nav class="nav" aria-label="ניווט ראשי">
+      <button type="button" class="nav-item active" data-view="all">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/></svg>
+        כל המוצרים
+      </button>
+      <button type="button" class="nav-item" data-view="favorites">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M12 20s-7-4.3-7-9a4 4 0 0 1 7-2.6A4 4 0 0 1 19 11c0 4.7-7 9-7 9Z"/></svg>
+        השמורים שלי
+      </button>
+    </nav>
+
+    <div class="side-label">קטגוריות</div>
+    <div class="cat-list" id="categoryList"></div>
+
+    <div class="side-foot">
+      <p>קישורי שותפים של אליאקספרס. המחיר והזמינות לפי האתר שלהם.</p>
+      <div class="side-links">
+        <a href="accessibility.html">נגישות</a>
+        <a href="privacy.html">פרטיות</a>
+      </div>
+      <a class="side-admin hidden" id="adminLink" href="admin.html">ניהול החנות</a>
+    </div>
+  </aside>
+
+  <div class="scrim" id="scrim" aria-hidden="true"></div>
+
+  <main class="main" id="main">
+    <div class="page-head">
+      <div>
+        <h1 id="pageTitle">כל המוצרים</h1>
+        <p class="page-sub" id="resultMeta"></p>
+        <p class="page-sub hidden" id="demoNote"></p>
+      </div>
+      <div class="page-tools">
+        <div class="price-chips" id="priceChips" aria-label="סינון לפי מחיר"></div>
+        <label class="sort">
+          מיון
+          <select id="sortSelect" aria-label="מיון מוצרים">
+            <option value="newest">החדשים ביותר</option>
+            <option value="popular">הנמכרים</option>
+            <option value="price_asc">מחיר: מהנמוך</option>
+            <option value="price_desc">מחיר: מהגבוה</option>
+          </select>
+        </label>
+      </div>
+    </div>
+
+    <div class="grid" id="grid" aria-live="polite"></div>
+    <div class="empty hidden" id="empty"></div>
+
+    <p class="foot-note">כל הרכישות מתבצעות באתר אליאקספרס. ייתכן שנקבל עמלת שותפים על רכישה דרכך, ללא תוספת מחיר. · <a href="accessibility.html">נגישות</a> · <a href="privacy.html">פרטיות</a></p>
+  </main>
+
+  <!-- פירוט מוצר -->
+  <div class="overlay hidden" id="productModal">
+    <div class="modal product-modal" role="dialog" aria-modal="true" aria-labelledby="pvTitle">
+      <div id="productBody"></div>
+    </div>
+  </div>
+
+  <!-- חשבון והעדפות -->
+  <div class="overlay hidden" id="accountModal">
+    <div class="modal account-modal" role="dialog" aria-modal="true" aria-labelledby="accountTitle">
+      <div class="modal-head">
+        <h2 id="accountTitle">החשבון שלי</h2>
+        <button type="button" class="modal-close" data-close="accountModal" aria-label="סגירה">×</button>
+      </div>
+      <div class="account-body" id="accountBody"></div>
+    </div>
+  </div>
+
+  <div class="toast-host" id="toastHost" aria-live="polite"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js" defer></script>
+  <script src="config.js?v=20261124g" defer></script>
+  <script src="assets/store.js?v=20261124g" defer></script>
+</body>
+</html>
