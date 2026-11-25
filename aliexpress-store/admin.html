@@ -95,7 +95,10 @@
           <p class="page-sub" id="tabSub"></p>
           <p class="page-sub hidden" id="demoNote"></p>
         </div>
-        <button type="button" class="btn" id="approveAllBtn">אישור כל הממתינים</button>
+        <div class="page-tools">
+          <button type="button" class="btn btn-primary" id="addProductBtn">הוספת מוצר ידנית</button>
+          <button type="button" class="btn" id="approveAllBtn">אישור כל הממתינים</button>
+        </div>
       </div>
 
       <div class="stats" id="stats"></div>
@@ -166,10 +169,55 @@
     </div>
   </div>
 
+    <!-- הוספת מוצר ידנית -->
+    <div class="overlay hidden" id="addModal">
+      <div class="modal" role="dialog" aria-modal="true" aria-labelledby="addTitle">
+        <div class="modal-head">
+          <h2 id="addTitle">הוספת מוצר ידנית</h2>
+          <button type="button" class="modal-close" data-close="addModal" aria-label="סגירה">×</button>
+        </div>
+        <div class="account-body">
+          <form id="addForm">
+            <div class="field">
+              <label for="addName">כותרת</label>
+              <input type="text" id="addName" required maxlength="120" />
+            </div>
+            <div class="field">
+              <label for="addDesc">תיאור</label>
+              <textarea id="addDesc" maxlength="600"></textarea>
+            </div>
+            <div class="field-row">
+              <div class="field">
+                <label for="addCategory">קטגוריה</label>
+                <select id="addCategory"></select>
+              </div>
+              <div class="field">
+                <label for="addPrice">מחיר (₪)</label>
+                <input type="number" id="addPrice" min="0" step="0.01" />
+              </div>
+            </div>
+            <div class="field">
+              <label for="addImage">כתובת תמונה</label>
+              <input type="url" id="addImage" placeholder="https://" />
+            </div>
+            <div class="field">
+              <label for="addLink">קישור שותפים</label>
+              <input type="url" id="addLink" placeholder="https://" required />
+            </div>
+            <p class="form-msg" id="addMsg"></p>
+            <div class="account-actions">
+              <button type="submit" class="btn btn-primary" id="addSaveBtn">הוספה לממתינים</button>
+              <button type="button" class="btn" data-close="addModal">ביטול</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
   <div class="toast-host" id="toastHost" aria-live="polite"></div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js" defer></script>
-  <script src="config.js?v=20261124g" defer></script>
-  <script src="assets/admin.js?v=20261124g" defer></script>
+  <script src="config.js?v=20261124h" defer></script>
+  <script src="assets/admin.js?v=20261124h" defer></script>
 </body>
 </html>

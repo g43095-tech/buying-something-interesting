@@ -76,6 +76,16 @@ CREATE POLICY "Admins can read all products"
   TO authenticated
   USING (EXISTS (SELECT 1 FROM public.admins WHERE email = auth.jwt() ->> 'email'));
 
+-- מנהלים יכולים גם להוסיף מוצר ידנית מהפאנל (הוא נכנס תמיד כ'ממתין')
+DROP POLICY IF EXISTS "Admins can insert products" ON public.shop_products;
+CREATE POLICY "Admins can insert products"
+  ON public.shop_products FOR INSERT
+  TO authenticated
+  WITH CHECK (
+    EXISTS (SELECT 1 FROM public.admins WHERE email = auth.jwt() ->> 'email')
+    AND status = 'pending'
+  );
+
 DROP POLICY IF EXISTS "Admins can update products" ON public.shop_products;
 CREATE POLICY "Admins can update products"
   ON public.shop_products FOR UPDATE
@@ -261,7 +271,8 @@ ON CONFLICT (email) DO NOTHING;
 
 -- 10. הרשאות טבלה (RLS לבדה אינה מספיקה: בלי GRANT כל בקשה נכשלת ב-403)
 GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
-GRANT SELECT ON public.shop_products TO anon, authenticated;
+GRANT SELECT ON public.shop_products TO anon;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.shop_products TO authenticated;
 GRANT ALL ON public.shop_products TO service_role;
 GRANT SELECT ON public.admins TO authenticated, service_role;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.shop_favorites TO authenticated, service_role;

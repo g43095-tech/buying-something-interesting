@@ -676,6 +676,96 @@
     toast('השינויים נשמרו');
   }
 
+  /* ---------- הוספת מוצר ידנית ---------- */
+
+  function openAdd() {
+    $('addName').value = '';
+    $('addDesc').value = '';
+    $('addPrice').value = '';
+    $('addImage').value = '';
+    $('addLink').value = '';
+    $('addMsg').textContent = '';
+    $('addMsg').className = 'form-msg';
+    $('addCategory').innerHTML = CATEGORIES.map(function (name) {
+      return '<option value="' + esc(name) + '">' + esc(name) + '</option>';
+    }).join('');
+
+    $('addModal').classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+    setTimeout(function () { $('addName').focus(); }, 20);
+  }
+
+  function closeAdd() {
+    $('addModal').classList.add('hidden');
+    document.body.style.overflow = '';
+  }
+
+  function manualExternalId() {
+    if (window.crypto && window.crypto.randomUUID) return 'manual:' + window.crypto.randomUUID();
+    return 'manual:' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
+  }
+
+  async function submitAdd(event) {
+    event.preventDefault();
+    var msg = $('addMsg');
+    var title = $('addName').value.trim();
+    var link = safeUrl($('addLink').value);
+    var image = safeUrl($('addImage').value);
+    var price = Number($('addPrice').value) || 0;
+
+    if (!title || !link) {
+      msg.textContent = 'כותרת וקישור שותפים (https://) הם שדות חובה.';
+      msg.className = 'form-msg error';
+      return;
+    }
+
+    var values = {
+      external_id: manualExternalId(),
+      title: title,
+      description: $('addDesc').value.trim(),
+      image_url: image,
+      category: $('addCategory').value || CATEGORIES[0],
+      price: price,
+      original_price: price,
+      discount_percent: 0,
+      affiliate_url: link,
+      status: 'pending',
+      ai_written: false
+    };
+
+    var btn = $('addSaveBtn');
+    btn.disabled = true;
+    msg.className = 'form-msg';
+    msg.textContent = 'שומר…';
+
+    try {
+      if (state.demo) {
+        Object.assign(values, { id: 'demo-manual-' + Date.now(), created_at: new Date().toISOString() });
+        state.products.unshift(values);
+      } else {
+        var res = await sb.from('shop_products').insert(values).select('*').single();
+        if (res.error) throw res.error;
+        if (!res.data) throw new Error('forbidden');
+        state.products.unshift(res.data);
+      }
+    } catch (err) {
+      msg.className = 'form-msg error';
+      msg.textContent = /row-level security|permission|forbidden|403/i.test(String(err && err.message))
+        ? 'השרת דחה את ההוספה. צריך להריץ שוב את aliexpress_shop_schema.sql כדי לעדכן הרשאות.'
+        : 'ההוספה נכשלה. נסו שוב.';
+      return;
+    } finally {
+      btn.disabled = false;
+    }
+
+    closeAdd();
+    state.tab = 'pending';
+    state.query = '';
+    $('adminSearch').value = '';
+    render();
+    toast('המוצר נוסף לממתינים. אשרו אותו כדי שיופיע באתר.');
+  }
+
   async function rewriteWithAi() {
     var product = findProduct($('editId').value);
     var msg = $('aiMsg');
@@ -763,17 +853,29 @@
 
     $('editForm').addEventListener('submit', saveEdit);
     $('aiRewriteBtn').addEventListener('click', rewriteWithAi);
+    $('addProductBtn').addEventListener('click', openAdd);
+    $('addForm').addEventListener('submit', submitAdd);
+
     document.querySelectorAll('[data-close]').forEach(function (btn) {
-      btn.addEventListener('click', function () { closeEdit(); });
+      btn.addEventListener('click', function () {
+        var overlay = btn.closest('.overlay');
+        if (overlay && overlay.id === 'addModal') closeAdd();
+        else closeEdit();
+      });
     });
 
     $('editModal').addEventListener('click', function (event) {
       if (event.target === $('editModal')) closeEdit();
     });
 
+    $('addModal').addEventListener('click', function (event) {
+      if (event.target === $('addModal')) closeAdd();
+    });
+
     document.addEventListener('keydown', function (event) {
       if (event.key === 'Escape') {
         closeEdit();
+        closeAdd();
         document.body.classList.remove('sidebar-open');
       }
     });
