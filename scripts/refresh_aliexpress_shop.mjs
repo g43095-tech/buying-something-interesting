@@ -33,6 +33,22 @@ function normalizeUrl(raw) {
   return value.startsWith('//') ? `https:${value}` : value;
 }
 
+// גלריית התמונות שמגיעה מאליאקספרס: מערך או { string: [...] }
+function galleryUrls(detail, mainImage) {
+  const raw = detail?.product_small_image_urls;
+  const list = Array.isArray(raw) ? raw : Array.isArray(raw?.string) ? raw.string : [];
+  const seen = new Set(mainImage ? [mainImage] : []);
+  const urls = [];
+  for (const item of list) {
+    const url = normalizeUrl(item);
+    if (!/^https?:\/\//i.test(url) || seen.has(url)) continue;
+    seen.add(url);
+    urls.push(url);
+    if (urls.length >= 5) break;
+  }
+  return urls;
+}
+
 function withSubId(rawUrl, subId) {
   try {
     const url = new URL(normalizeUrl(rawUrl));
@@ -53,7 +69,7 @@ function signParams(params) {
 
 async function fetchApproved() {
   const res = await fetch(
-    `${SUPABASE_URL}/rest/v1/shop_products?select=id,external_id,price,original_price,discount_percent,rating,orders,affiliate_url,sub_id,missing_count&status=eq.approved&limit=500`,
+    `${SUPABASE_URL}/rest/v1/shop_products?select=id,external_id,price,original_price,discount_percent,rating,orders,affiliate_url,sub_id,missing_count,image_url,images&status=eq.approved&limit=500`,
     {
       headers: { apikey: SUPABASE_SECRET_KEY, Authorization: `Bearer ${SUPABASE_SECRET_KEY}` },
       signal: AbortSignal.timeout(20000)
@@ -77,7 +93,7 @@ async function queryDetails(productIds) {
     target_currency: 'ILS',
     target_language: 'EN',
     fields:
-      'product_id,product_title,target_sale_price,target_original_price,discount,evaluate_rate,lastest_volume,product_main_image_url,promotion_link'
+      'product_id,product_title,target_sale_price,target_original_price,discount,evaluate_rate,lastest_volume,product_main_image_url,product_small_image_urls,promotion_link'
   };
   params.sign = signParams(params);
 
@@ -162,6 +178,18 @@ async function main() {
         missing_count: 0
       };
       if (normalizeUrl(detail.product_main_image_url)) values.image_url = normalizeUrl(detail.product_main_image_url);
+      // מוצר ותיק עם תמונה ראשית בלבד: משלימים גלריה ומשאירים את ההחלטות הקיימות
+      const existingImages = Array.isArray(local.images) ? local.images.filter((img) => img && img.url) : [];
+      if (existingImages.length <= 1) {
+        const main = normalizeUrl(detail.product_main_image_url) || normalizeUrl(local.image_url);
+        if (main) {
+          const approvedByUrl = new Map(existingImages.map((img) => [img.url, Boolean(img.approved)]));
+          values.images = [
+            { url: main, approved: approvedByUrl.has(main) ? approvedByUrl.get(main) : true },
+            ...galleryUrls(detail, main).map((url) => ({ url, approved: approvedByUrl.get(url) || false }))
+          ];
+        }
+      }
       const link = withSubId(detail.promotion_link, local.sub_id);
       if (link) values.affiliate_url = link;
 

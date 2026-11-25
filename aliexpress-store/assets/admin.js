@@ -144,6 +144,14 @@
     return String(n);
   }
 
+  // הדירוג מאליאקספרס הוא אחוז דירוגים חיוביים (97.5), לא כוכבים
+  function ratingLabel(product) {
+    var n = Number(product.rating) || 0;
+    if (!n) return '';
+    if (n <= 5) n *= 20;
+    return n.toFixed(1).replace(/\.0$/, '') + '% חיוביים';
+  }
+
   function toast(message) {
     var host = $('toastHost');
     if (!host) return;
@@ -367,7 +375,7 @@
           '<span><b>' + money(p.price) + '</b></span>' +
           (Number(p.original_price) > Number(p.price) ? '<span>במקום ' + money(p.original_price) + '</span>' : '') +
           '<span>' + esc(p.category || '') + '</span>' +
-          (Number(p.rating) ? '<span>★ ' + Number(p.rating).toFixed(1) + '</span>' : '') +
+          (ratingLabel(p) ? '<span>' + esc(ratingLabel(p)) + '</span>' : '') +
           (Number(p.orders) ? '<span>' + compactCount(p.orders) + ' הזמנות</span>' : '') +
           '<span>' + formatDate(p.created_at) + '</span>' +
           '<span class="pill ' + esc(p.status) + '">' + statusLabel + '</span>' +
@@ -600,6 +608,33 @@
     toast('המוצר נמחק');
   }
 
+  var editGalleryItems = [];
+
+  function galleryOf(product) {
+    var list = Array.isArray(product.images) ? product.images : [];
+    var items = list
+      .filter(function (img) { return img && safeUrl(img.url); })
+      .map(function (img) { return { url: safeUrl(img.url), approved: Boolean(img.approved) }; });
+    if (!items.length && safeUrl(product.image_url)) items.push({ url: safeUrl(product.image_url), approved: true });
+    return items;
+  }
+
+  function renderEditGallery(product) {
+    editGalleryItems = galleryOf(product);
+    var host = $('editGallery');
+    if (!host) return;
+    if (!editGalleryItems.length) {
+      host.innerHTML = '<p class="form-note">אין תמונות למוצר הזה. אפשר להוסיף כתובת תמונה בשדה שלמעלה.</p>';
+      return;
+    }
+    host.innerHTML = editGalleryItems.map(function (item, index) {
+      return '<label class="gallery-item">' +
+        '<img src="' + esc(item.url) + '" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.visibility=\'hidden\'" />' +
+        '<span><input type="checkbox" data-gallery-index="' + index + '"' + (item.approved ? ' checked' : '') + ' /> הצגה באתר</span>' +
+        '</label>';
+    }).join('');
+  }
+
   function openEdit(id) {
     var p = findProduct(id);
     if (!p) return;
@@ -614,6 +649,7 @@
     $('editLink').value = p.affiliate_url || '';
     $('editMsg').textContent = '';
     $('aiMsg').textContent = '';
+    renderEditGallery(p);
 
     var category = p.category || CATEGORIES[0];
     var known = CATEGORIES.indexOf(category) === -1 ? CATEGORIES.concat([category]) : CATEGORIES;
@@ -650,6 +686,17 @@
       image_url: $('editImage').value.trim(),
       affiliate_url: $('editLink').value.trim()
     };
+
+    // אישור לכל תמונה בנפרד: מה שסומן נשמר בגלריה ורק הוא מוצג באתר
+    var gallery = editGalleryItems.map(function (item, index) {
+      var box = document.querySelector('[data-gallery-index="' + index + '"]');
+      return { url: item.url, approved: box ? box.checked : item.approved };
+    });
+    if (values.image_url && (!gallery.length || gallery[0].url !== values.image_url)) {
+      gallery.unshift({ url: values.image_url, approved: true });
+    }
+    if (!values.image_url && gallery.length) values.image_url = gallery[0].url;
+    values.images = gallery;
 
     if (!values.title || !values.affiliate_url) {
       $('editMsg').textContent = 'כותרת וקישור שותפים הם שדות חובה.';

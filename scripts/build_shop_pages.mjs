@@ -23,7 +23,7 @@ const SITE_URL = String(valueOf('--site-url', process.env.SHOP_SITE_URL || '')).
 const SUPABASE_URL = (process.env.SUPABASE_URL || 'https://louxyixmnftfqcfjkxsz.supabase.co').replace(/\/+$/, '');
 const SUPABASE_SECRET_KEY = (process.env.SUPABASE_SECRET_KEY || '').trim();
 const SITE_NAME = 'המדף';
-const ASSET_VERSION = '20261124g';
+const ASSET_VERSION = '20261125a';
 
 const CATEGORY_SLUGS = {
   'בית ומטבח': 'home-kitchen',
@@ -94,14 +94,39 @@ function categoryPath(name) {
 function imageVariants(raw) {
   const src = normalizeUrl(raw);
   if (!src) return { src: '', srcset: '' };
-  const match = /^(https?:\/\/[^/]+\/.+?)(\.(?:jpe?g|png|webp))$/i.exec(src);
-  if (!match || !/alicdn\.com/i.test(match[1]) || /_\d+x\d+$/.test(match[1])) {
-    return { src, srcset: '' };
+  // באליאקספרס סיומת שינוי הגודל נדבקת אחרי שם הקובץ: name.jpg_640x640.jpg
+  const original = src
+    .replace(/_\.webp$/i, '')
+    .replace(/_(\d+)x(\d+)(q\d+)?\.(jpe?g|png|webp)$/i, '.$4');
+  const match = /^(https?:\/\/[^/]+\/.+)(\.(?:jpe?g|png|webp))$/i.exec(original);
+  if (!match || !/(alicdn\.com|aliexpress-media\.com)/i.test(match[1])) {
+    return { src: original, srcset: '' };
   }
-  const [, base, ext] = match;
-  const small = `${base}_300x300${ext}`;
-  const large = `${base}_640x640${ext}`;
+  const ext = match[2];
+  const small = `${original}_300x300${ext}`;
+  const large = `${original}_640x640${ext}`;
   return { src: large, srcset: `${small} 300w, ${large} 640w` };
+}
+
+// התמונה הראשית: הראשונה שסומנה כמאושרת, ואם אין גלריה — image_url
+function primaryImage(product) {
+  const list = Array.isArray(product.images) ? product.images : [];
+  const approved = list.filter((img) => img && img.approved && normalizeUrl(img.url));
+  if (approved.length) return normalizeUrl(approved[0].url);
+  return normalizeUrl(product.image_url);
+}
+
+// הדירוג מגיע מאליאקספרס כאחוז דירוגים חיוביים (97.5), לא ככוכבים
+function ratingPercentValue(product) {
+  const n = Number(product.rating) || 0;
+  if (!n) return 0;
+  return n <= 5 ? n * 20 : n;
+}
+
+function ratingLabel(product) {
+  const n = ratingPercentValue(product);
+  if (!n) return '';
+  return `${n.toFixed(1).replace(/\.0$/, '')}% חיוביים`;
 }
 
 function formatDate(value) {
@@ -112,7 +137,7 @@ function formatDate(value) {
 
 function fallbackWhy(product) {
   const parts = [];
-  if (Number(product.rating) >= 4.5) parts.push(`דירוג ${Number(product.rating).toFixed(1)}`);
+  if (ratingPercentValue(product) >= 92) parts.push(`דירוג ${ratingLabel(product)}`);
   if (Number(product.orders) >= 1000) parts.push(`${Math.round(Number(product.orders) / 100) / 10}K הזמנות`);
   if (Number(product.discount_percent) >= 20) parts.push(`${Math.round(Number(product.discount_percent))}% הנחה`);
   return parts.length ? `נבחר בגלל ${parts.join(', ')}.` : 'מוצר שנבחר בקפידה מתוך הקטלוג של אליאקספרס.';
@@ -120,8 +145,8 @@ function fallbackWhy(product) {
 
 function shippingText(days) {
   const n = Number(days) || 0;
-  if (!n) return 'משלוח לפי אליאקספרס';
-  return `משלוח משוער: ${n}–${n + 6} ימים`;
+  if (!n) return 'לא צוין — לפי דף המוצר באליאקספרס';
+  return `${n}–${n + 6} ימים`;
 }
 
 async function loadProducts() {
@@ -206,12 +231,12 @@ function productJsonLd(product, canonical) {
       url: withSubId(product.affiliate_url, product.sub_id || product.id) || canonical || undefined
     }
   };
-  const image = normalizeUrl(product.image_url);
+  const image = normalizeUrl(primaryImage(product));
   if (image) data.image = [image];
-  if (Number(product.rating) > 0 && Number(product.orders) > 0) {
+  if (ratingPercentValue(product) > 0 && Number(product.orders) > 0) {
     data.aggregateRating = {
       '@type': 'AggregateRating',
-      ratingValue: Number(product.rating),
+      ratingValue: Number((ratingPercentValue(product) / 20).toFixed(1)),
       reviewCount: Number(product.orders),
       bestRating: 5
     };
@@ -228,7 +253,7 @@ function crumbs(category) {
 }
 
 function productPage(product, related) {
-  const image = imageVariants(product.image_url);
+  const image = imageVariants(primaryImage(product));
   const discount = Number(product.discount_percent) || 0;
   const original = Number(product.original_price) || 0;
   const price = Number(product.price) || 0;
@@ -240,7 +265,7 @@ function productPage(product, related) {
   const category = product.category || 'כללי';
 
   const facts = [];
-  if (Number(product.rating)) facts.push(`<li><span class="fact-k">דירוג</span> ★ ${Number(product.rating).toFixed(1)}</li>`);
+  if (ratingPercentValue(product)) facts.push(`<li><span class="fact-k">דירוג</span> ${esc(ratingLabel(product))}</li>`);
   if (Number(product.orders)) facts.push(`<li><span class="fact-k">הזמנות</span> ${Number(product.orders).toLocaleString('he-IL')}</li>`);
   facts.push(`<li><span class="fact-k">משלוח</span> ${esc(shippingText(product.shipping_days))}</li>`);
   if (updated) facts.push(`<li><span class="fact-k">מחיר עודכן</span> ${esc(updated)}</li>`);
@@ -258,7 +283,7 @@ ${related.map((item) => card(item, '../../')).join('\n')}
     title: `${product.title} — ${SITE_NAME}`,
     description,
     canonical,
-    ogImage: normalizeUrl(product.image_url),
+    ogImage: normalizeUrl(primaryImage(product)),
     jsonLd: productJsonLd(product, canonical)
   })}
 <body class="product-page" data-product-id="${esc(product.id)}">
@@ -314,7 +339,7 @@ ${footer()}
 }
 
 function card(product, prefix = '') {
-  const image = imageVariants(product.image_url);
+  const image = imageVariants(primaryImage(product));
   const original = Number(product.original_price) || 0;
   const price = Number(product.price) || 0;
   const discount = Number(product.discount_percent) || 0;
@@ -329,7 +354,7 @@ ${discount >= 5 ? `            <span class="badge">−${discount}%</span>` : ''}
           <div class="card-body">
             <h3 class="card-title">${esc(product.title)}</h3>
             <div class="price-line"><span class="price">${money(price)}</span>${original > price ? `<span class="old-price">${money(original)}</span>` : ''}</div>
-            <div class="card-meta">${Number(product.rating) ? `<span class="star">★ ${Number(product.rating).toFixed(1)}</span>` : ''}${Number(product.orders) ? `<span>${Number(product.orders).toLocaleString('he-IL')} הזמנות</span>` : ''}</div>
+            <div class="card-meta">${ratingLabel(product) ? `<span class="star">${esc(ratingLabel(product))}</span>` : ''}${Number(product.orders) ? `<span>${Number(product.orders).toLocaleString('he-IL')} הזמנות</span>` : ''}</div>
           </div>
         </a>`;
 }
@@ -348,7 +373,7 @@ function categoryPage(category, products, allCategories) {
     description,
     canonical,
     ogType: 'website',
-    ogImage: normalizeUrl(products[0] && products[0].image_url),
+    ogImage: normalizeUrl(products[0] && primaryImage(products[0])),
     jsonLd: {
       '@context': 'https://schema.org',
       '@type': 'CollectionPage',

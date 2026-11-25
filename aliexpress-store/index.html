@@ -11,7 +11,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Frank+Ruhl+Libre:wght@500;700&family=Heebo:wght@400;500;600;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="assets/store.css?v=20261124g" />
+  <link rel="stylesheet" href="assets/store.css?v=20261125a" />
 </head>
 <body>
   <a class="skip-link" href="#main">דילוג לתוכן</a>
@@ -45,7 +45,7 @@
     <a class="brand" href="index.html"><span class="mark" aria-hidden="true"></span>המדף</a>
     <p class="brand-sub">מוצרים נבחרים מאליאקספרס</p>
 
-    <nav class="nav" aria-label="ניווט ראשי">
+    <nav class="nav" id="mainNav" aria-label="ניווט ראשי">
       <button type="button" class="nav-item active" data-view="all">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/></svg>
         כל המוצרים
@@ -116,10 +116,26 @@
     </div>
   </div>
 
+  <!-- תצוגה מוגדלת של תמונה -->
+  <div class="overlay hidden" id="imageModal">
+    <div class="img-viewer" role="dialog" aria-modal="true" aria-label="תצוגת תמונה">
+      <div class="img-viewer-bar">
+        <button type="button" data-zoom="out" aria-label="הקטנת התמונה">−</button>
+        <span id="zoomLevel">100%</span>
+        <button type="button" data-zoom="in" aria-label="הגדלת התמונה">+</button>
+        <button type="button" data-zoom="reset" aria-label="איפוס התצוגה">איפוס</button>
+        <button type="button" class="modal-close img-viewer-close" data-close="imageModal" aria-label="סגירה">×</button>
+      </div>
+      <div class="img-viewer-stage" id="imgStage">
+        <img id="imageViewerImg" alt="" decoding="async" referrerpolicy="no-referrer" />
+      </div>
+    </div>
+  </div>
+
   <div class="toast-host" id="toastHost" aria-live="polite"></div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js" defer></script>
-  <script src="config.js?v=20261124g" defer></script>
-  <script src="assets/store.js?v=20261124g" defer></script>
+  <script src="config.js?v=20261125a" defer></script>
+  <script src="assets/store.js?v=20261125a" defer></script>
 </body>
 </html>

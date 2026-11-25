@@ -48,7 +48,15 @@ ALTER TABLE public.shop_products
   ADD COLUMN IF NOT EXISTS shipping_days INT NOT NULL DEFAULT 0,
   ADD COLUMN IF NOT EXISTS sub_id TEXT NOT NULL DEFAULT '',
   ADD COLUMN IF NOT EXISTS price_updated_at TIMESTAMPTZ,
-  ADD COLUMN IF NOT EXISTS missing_count INT NOT NULL DEFAULT 0;
+  ADD COLUMN IF NOT EXISTS missing_count INT NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS images JSONB NOT NULL DEFAULT '[]'::jsonb;
+
+-- גלריית תמונות לכל מוצר: [{ "url": "...", "approved": true/false }]
+-- המוצר נשמר גם ב-image_url (התמונה הראשית) כדי לא לשבור קוד קיים.
+UPDATE public.shop_products
+SET images = jsonb_build_array(jsonb_build_object('url', image_url, 'approved', TRUE))
+WHERE COALESCE(image_url, '') <> ''
+  AND (images IS NULL OR jsonb_array_length(images) = 0);
 
 -- סטטוס 'removed' מתווסף למוצרים שהוסרו אוטומטית כי הקישור/המלאי נגמר
 ALTER TABLE public.shop_products DROP CONSTRAINT IF EXISTS shop_products_status_check;

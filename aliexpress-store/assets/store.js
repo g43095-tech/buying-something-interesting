@@ -269,26 +269,65 @@
     }
   }
 
+  // באליאקספרס סיומת שינוי הגודל נדבקת אחרי שם הקובץ: name.jpg_640x640.jpg
+  function originalImageUrl(raw) {
+    return safeUrl(raw)
+      .replace(/_\.webp$/i, '')
+      .replace(/_(\d+)x(\d+)(q\d+)?\.(jpe?g|png|webp)$/i, '.$4');
+  }
+
   function imageVariants(raw) {
-    var src = safeUrl(raw);
+    var src = originalImageUrl(raw);
     if (!src) return { src: '', srcset: '' };
-    var match = /^(https?:\/\/[^/]+\/.+?)(\.(?:jpe?g|png|webp))$/i.exec(src);
-    if (!match || !/alicdn\.com/i.test(match[1]) || /_\d+x\d+$/.test(match[1])) return { src: src, srcset: '' };
-    var base = match[1];
+    var match = /^(https?:\/\/[^/]+\/.+)(\.(?:jpe?g|png|webp))$/i.exec(src);
+    if (!match || !/(alicdn\.com|aliexpress-media\.com)/i.test(match[1])) return { src: src, srcset: '' };
     var ext = match[2];
     return {
-      src: base + '_640x640' + ext,
-      srcset: base + '_300x300' + ext + ' 300w, ' + base + '_640x640' + ext + ' 640w'
+      src: src + '_640x640' + ext,
+      srcset: src + '_300x300' + ext + ' 300w, ' + src + '_640x640' + ext + ' 640w'
     };
   }
 
   function imageTag(product, sizes, loading) {
-    var image = imageVariants(product.image_url);
+    var raw = approvedImages(product)[0] || '';
+    var image = imageVariants(raw);
     if (!image.src) return '<div class="img-missing">אין תמונה</div>';
+    var fallback = originalImageUrl(raw);
     return '<img src="' + esc(image.src) + '"' +
       (image.srcset ? ' srcset="' + esc(image.srcset) + '" sizes="' + esc(sizes) + '"' : '') +
-      ' alt="' + esc(product.title) + '" width="300" height="300" loading="' + (loading || 'lazy') + '" decoding="async"' +
-      ' onerror="this.parentElement.classList.add(\'no-img\');this.remove()" />';
+      ' alt="' + esc(product.title) + '" width="300" height="300" loading="' + (loading || 'lazy') + '" decoding="async" referrerpolicy="no-referrer"' +
+      ' onerror="if(this.dataset.fb){this.parentElement.classList.add(\'no-img\');this.remove();}else{this.dataset.fb=\'1\';this.removeAttribute(\'srcset\');this.src=\'' + esc(fallback) + '\';}" />';
+  }
+
+  // הדירוג מגיע מאליאקספרס כאחוז דירוגים חיוביים (97.5), לא ככוכבים
+  function ratingPercentValue(product) {
+    var n = Number(product.rating) || 0;
+    if (!n) return 0;
+    return n <= 5 ? n * 20 : n;
+  }
+
+  function ratingLabel(product) {
+    var n = ratingPercentValue(product);
+    if (!n) return '';
+    return n.toFixed(1).replace(/\.0$/, '') + '% חיוביים';
+  }
+
+  function shippingLabel(product) {
+    var n = Number(product.shipping_days) || 0;
+    return n ? 'משלוח ' + n + '–' + (n + 6) + ' ימים' : 'זמן משלוח לא צוין — לפי דף אליאקספרס';
+  }
+
+  // רק תמונות שאושרו בממשק הניהול מוצגות בציבור
+  function approvedImages(product) {
+    var list = Array.isArray(product.images) ? product.images : [];
+    var urls = [];
+    list.forEach(function (img) {
+      var url = safeUrl(img && img.url);
+      if (img && img.approved && url && urls.indexOf(url) === -1) urls.push(url);
+    });
+    var main = safeUrl(product.image_url);
+    if (!urls.length && !list.length && main) urls.push(main);
+    return urls;
   }
 
   /* ---------- מדידת קליקים ---------- */
@@ -348,7 +387,8 @@
   }
 
   function trapTab(event) {
-    var overlay = document.querySelector('.overlay:not(.hidden)');
+    var overlays = document.querySelectorAll('.overlay:not(.hidden)');
+    var overlay = overlays[overlays.length - 1];
     if (!overlay) return;
     var items = focusable(overlay);
     if (!items.length) return;
@@ -474,7 +514,7 @@
             (original > Number(p.price) ? '<span class="old-price">' + money(original) + '</span>' : '') +
           '</div>' +
           '<div class="card-meta">' +
-            (Number(p.rating) ? '<span class="star">★ ' + Number(p.rating).toFixed(1) + '</span>' : '') +
+            (ratingPercentValue(p) ? '<span class="star">' + esc(ratingLabel(p)) + '</span>' : '') +
             (Number(p.orders) ? '<span>' + compactCount(p.orders) + ' הזמנות</span>' : '') +
           '</div>' +
         '</div>' +
@@ -574,7 +614,7 @@
     try {
       var res = await withTimeout(
         sb.from('shop_products')
-          .select('id,title,description,why,image_url,category,price,original_price,discount_percent,rating,orders,shipping_days,affiliate_url,price_updated_at,created_at,status')
+          .select('id,title,description,why,image_url,images,category,price,original_price,discount_percent,rating,orders,shipping_days,affiliate_url,price_updated_at,created_at,status')
           .eq('status', 'approved')
           .order('created_at', { ascending: false })
           .limit(300),
@@ -712,8 +752,33 @@
     return '<div class="pv-why" style="background:transparent;border:0;padding:0">' +
       '<h3>עוד ב' + esc(product.category || 'קטלוג') + '</h3>' +
       '<div class="pv-related">' + related.map(function (p) {
-        return '<button type="button" data-open="' + esc(p.id) + '">' + imageTag(p, '26px') + '<span>' + esc(p.title) + '</span></button>';
+        var thumb = imageVariants(approvedImages(p)[0] || '');
+        return '<button type="button" data-open="' + esc(p.id) + '">' +
+          (thumb.src ? '<img src="' + esc(thumb.src) + '" alt="" loading="lazy" referrerpolicy="no-referrer" />' : '') +
+          '<span>' + esc(p.title) + '</span></button>';
       }).join('') + '</div></div>';
+  }
+
+  var pvGallery = [];
+  var pvIndex = 0;
+  var pvTitle = '';
+  var zoomScale = 1;
+
+  function pvMainImageHtml(url, title) {
+    var image = imageVariants(url);
+    if (!image.src) return '<div class="img-missing">אין תמונה</div>';
+    return '<img id="pvMainImg" src="' + esc(image.src) + '"' +
+      (image.srcset ? ' srcset="' + esc(image.srcset) + '" sizes="(max-width: 960px) 92vw, 420px"' : '') +
+      ' alt="' + esc(title) + '" width="640" height="640" decoding="async" referrerpolicy="no-referrer" />';
+  }
+
+  function pvThumbsHtml(gallery, title) {
+    if (gallery.length < 2) return '';
+    return '<div class="pv-thumbs">' + gallery.map(function (url, index) {
+      var image = imageVariants(url);
+      return '<button type="button" class="pv-thumb' + (index === 0 ? ' active' : '') + '" data-thumb="' + esc(url) + '" aria-label="תמונה ' + (index + 1) + ' של ' + esc(title) + '">' +
+        '<img src="' + esc(image.src || url) + '" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" /></button>';
+    }).join('') + '</div>';
   }
 
   function openProduct(id) {
@@ -725,6 +790,10 @@
     var discount = discountOf(product);
     var link = affiliateLink(product);
     var updated = product.price_updated_at || product.updated_at;
+    var gallery = approvedImages(product);
+    pvGallery = gallery;
+    pvIndex = 0;
+    pvTitle = product.title;
 
     $('productBody').innerHTML =
       '<div class="modal-head">' +
@@ -732,7 +801,11 @@
         '<button type="button" class="modal-close" data-close="productModal" aria-label="סגירה">×</button>' +
       '</div>' +
       '<div class="product-view">' +
-        '<div class="pv-media">' + imageTag(product, '(max-width: 960px) 92vw, 420px', 'eager') + '</div>' +
+        '<div class="pv-media">' +
+          (gallery.length
+            ? '<button type="button" class="pv-zoom" data-img-open aria-label="תצוגה מוגדלת של התמונה">' + pvMainImageHtml(gallery[0], product.title) + '</button>' + pvThumbsHtml(gallery, product.title)
+            : '<div class="img-missing">אין תמונה</div>') +
+        '</div>' +
         '<div class="pv-info">' +
           '<span class="pv-cat">' + esc(product.category || '') + '</span>' +
           '<h2 id="pvTitle">' + esc(product.title) + '</h2>' +
@@ -742,9 +815,9 @@
             (discount >= 5 ? '<span class="pill">−' + discount + '%</span>' : '') +
           '</div>' +
           '<div class="pv-meta">' +
-            (Number(product.rating) ? '<span>★ ' + Number(product.rating).toFixed(1) + '</span>' : '') +
+            (ratingPercentValue(product) ? '<span>' + esc(ratingLabel(product)) + '</span>' : '') +
             (Number(product.orders) ? '<span>' + compactCount(product.orders) + ' הזמנות</span>' : '') +
-            '<span>' + (Number(product.shipping_days) ? 'משלוח ' + Number(product.shipping_days) + '–' + (Number(product.shipping_days) + 6) + ' ימים' : 'משלוח לפי אליאקספרס') + '</span>' +
+            '<span>' + esc(shippingLabel(product)) + '</span>' +
           '</div>' +
           '<div class="pv-extra">' +
             (product.why ? '<div class="pv-why"><h3>למה בחרנו בזה</h3><p>' + esc(product.why) + '</p></div>' : '') +
@@ -755,13 +828,38 @@
             (link ? '<a class="btn btn-primary" href="' + esc(link) + '" target="_blank" rel="nofollow sponsored noopener" data-buy="' + esc(product.id) + '">לצפייה באליאקספרס</a>' : '') +
             '<button type="button" class="btn" data-pv-fav="' + esc(product.id) + '" aria-pressed="' + saved + '">' + (saved ? 'שמור אצלי' : 'שמירה') + '</button>' +
             '<button type="button" class="btn" data-share-pv="' + esc(product.id) + '">שיתוף</button>' +
-            '<a class="btn" href="' + esc(productPath(product)) + '">פתיחת הדף</a>' +
+            '<a class="pv-open-link" href="' + esc(productPath(product)) + '">פתיחת הדף</a>' +
           '</div>' +
           '<p class="pv-share-note">קישור שותפים: ייתכן שנקבל עמלה, ללא תוספת מחיר.</p>' +
         '</div>' +
       '</div>';
 
     openModal('productModal');
+  }
+
+  /* ---------- תצוגת תמונה מוגדלת ---------- */
+
+  function setZoom(scale) {
+    zoomScale = Math.min(4, Math.max(1, scale));
+    var img = $('imageViewerImg');
+    if (img) {
+      img.style.width = Math.round(zoomScale * 100) + '%';
+      img.style.maxWidth = 'none';
+    }
+    var label = $('zoomLevel');
+    if (label) label.textContent = Math.round(zoomScale * 100) + '%';
+  }
+
+  function openImageViewer(url, title) {
+    var src = safeUrl(url);
+    var img = $('imageViewerImg');
+    if (!src || !img) return;
+    img.src = src;
+    img.alt = title || 'תמונת המוצר';
+    setZoom(1);
+    var stage = $('imgStage');
+    if (stage) { stage.scrollTop = 0; stage.scrollLeft = 0; }
+    openModal('imageModal');
   }
 
   function categoryOptionsHtml(selected) {
@@ -1045,13 +1143,48 @@
         if (boughtProduct) trackClick(boughtProduct, 'buy');
         return;
       }
+      var thumb = event.target.closest('[data-thumb]');
+      if (thumb) {
+        var thumbUrl = thumb.getAttribute('data-thumb');
+        var thumbIndex = pvGallery.indexOf(thumbUrl);
+        if (thumbIndex !== -1) pvIndex = thumbIndex;
+        var mainImage = $('pvMainImg');
+        var thumbImage = imageVariants(thumbUrl);
+        if (mainImage && thumbImage.src) {
+          mainImage.src = thumbImage.src;
+          if (thumbImage.srcset) mainImage.setAttribute('srcset', thumbImage.srcset);
+          else mainImage.removeAttribute('srcset');
+        }
+        document.querySelectorAll('.pv-thumb').forEach(function (btn) {
+          btn.classList.toggle('active', btn === thumb);
+        });
+        return;
+      }
+      var imageButton = event.target.closest('[data-img-open]');
+      if (imageButton) {
+        openImageViewer(pvGallery[pvIndex], pvTitle);
+        return;
+      }
       var related = event.target.closest('[data-open]');
       if (related) {
         openProduct(related.getAttribute('data-open'));
         return;
       }
-      var close = event.target.closest('[data-close]');
-      if (close) closeModal(close.getAttribute('data-close'));
+    });
+
+    $('imageModal').addEventListener('click', function (event) {
+      var zoom = event.target.closest('[data-zoom]');
+      if (!zoom) return;
+      var action = zoom.getAttribute('data-zoom');
+      if (action === 'in') setZoom(zoomScale + 0.5);
+      else if (action === 'out') setZoom(zoomScale - 0.5);
+      else setZoom(1);
+    });
+
+    // כפתורי הסגירה (X) של כל החלונות, כולל חלון החשבון
+    document.addEventListener('click', function (event) {
+      var closer = event.target.closest('[data-close]');
+      if (closer) closeModal(closer.getAttribute('data-close'));
     });
 
     document.querySelectorAll('.overlay').forEach(function (overlay) {
@@ -1062,7 +1195,8 @@
 
     document.addEventListener('keydown', function (event) {
       if (event.key === 'Escape') {
-        document.querySelectorAll('.overlay:not(.hidden)').forEach(function (overlay) { closeModal(overlay.id); });
+        var openOverlays = document.querySelectorAll('.overlay:not(.hidden)');
+        if (openOverlays.length) closeModal(openOverlays[openOverlays.length - 1].id);
         document.body.classList.remove('sidebar-open');
       }
       if (event.key === 'Tab') trapTab(event);

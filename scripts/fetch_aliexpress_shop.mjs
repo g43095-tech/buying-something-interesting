@@ -57,6 +57,22 @@ function normalizeUrl(raw) {
   return value.startsWith('//') ? `https:${value}` : value;
 }
 
+// גלריית התמונות שמגיעה מאליאקספרס: מערך או { string: [...] }
+function galleryUrls(product, mainImage) {
+  const raw = product?.product_small_image_urls;
+  const list = Array.isArray(raw) ? raw : Array.isArray(raw?.string) ? raw.string : [];
+  const seen = new Set(mainImage ? [mainImage] : []);
+  const urls = [];
+  for (const item of list) {
+    const url = normalizeUrl(item);
+    if (!/^https?:\/\//i.test(url) || seen.has(url)) continue;
+    seen.add(url);
+    urls.push(url);
+    if (urls.length >= 5) break;
+  }
+  return urls;
+}
+
 function pickRandomQueries(count = 4) {
   const copy = [...SEARCH_QUERIES];
   for (let i = copy.length - 1; i > 0; i--) {
@@ -253,6 +269,10 @@ function buildRecord(product, copy, query) {
   const original = toNumber(product.target_original_price);
   const image = normalizeUrl(product.product_main_image_url);
   const subId = String(product.product_id);
+  // התמונה הראשית מאושרת כברירת מחדל; שאר התמונות ממתינות לאישור מנהל
+  const images = image
+    ? [{ url: image, approved: true }, ...galleryUrls(product, image).map((url) => ({ url, approved: false }))]
+    : [];
 
   return {
     external_id: `aliexpress:${product.product_id}`,
@@ -260,6 +280,7 @@ function buildRecord(product, copy, query) {
     description: copy?.description || '',
     why: copy?.why || '',
     image_url: image,
+    images,
     category: copy?.category || CATEGORIES[0],
     price,
     original_price: original > price ? original : 0,
