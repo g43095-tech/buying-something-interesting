@@ -1,5 +1,13 @@
 # הפעלה — צ'ק־ליסט קצר
 
+## מצב נוכחי (הוקם אוטומטית)
+
+- **האתר באוויר:** <https://g43095-tech.github.io/AliExpress-website/>
+- **פאנל ניהול:** <https://g43095-tech.github.io/AliExpress-website/admin.html> — כניסה עם `mytovmail@gmail.com` והסיסמה שנמסרה בנפרד.
+- **Supabase:** פרויקט `louxyixmnftfqcfjkxsz` — הסכמה, ההרשאות, המנהל ומשתמש הכניסה כבר קיימים.
+- **GitHub:** <https://github.com/g43095-tech/AliExpress-website> — הקוד, הסוד `SUPABASE_SECRET_KEY`, המשתנה `SHOP_SITE_URL` והפריסה האוטומטית (GitHub Pages) פעילים.
+- **מה חסר כדי להתחיל לקבל מוצרים:** `ALIEXPRESS_APP_KEY`, `ALIEXPRESS_APP_SECRET`, `ALIEXPRESS_TRACKING_ID` ו-`GEMINI_API_KEY` כסודות במאגר. בלי הם הריצה מדלגת על השליפה והאתר נבנה ריק אבל תקין.
+
 > מתקין מאפס על חשבון חדש? עקוב אחרי **[NEW-ACCOUNT-SETUP.md](NEW-ACCOUNT-SETUP.md)** — הוא כולל את פתיחת כל החשבונות (Supabase, GitHub, Cloudflare, AliExpress, Gemini). הקישורים למטה מתייחסים לפרויקט Supabase הישן.
 
 כל הסודות נשארים אצלך (GitHub / Supabase / Cloudflare). **אל תשלח לי מפתחות בצ'אט.**
