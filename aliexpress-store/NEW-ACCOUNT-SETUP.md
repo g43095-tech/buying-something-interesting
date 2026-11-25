@@ -1,6 +1,6 @@
 # התקנה מאפס על חשבון חדש — המדריך המלא
 
-> **עדכון:** ההתקנה כבר בוצעה בפועל. האחסון שנבחר הוא **GitHub Pages** (חינם, בלי חשבון Cloudflare) והאתר חי בכתובת <https://g43095-tech.github.io/AliExpress-website/>. המדריך נשאר כאן כמסמך עזר מלא, וכל מקום שבו כתוב Cloudflare אפשר להחליף ב-GitHub Pages — הוא כבר מוגדר ועובד. מצב מדויק נמצא ב-[ACTIVATE.md](ACTIVATE.md).
+> **עדכון:** ההתקנה כבר בוצעה בפועל. האחסון שנבחר הוא **GitHub Pages** (חינם, בלי חשבון Cloudflare) והאתר חי בכתובת <https://g43095-tech.github.io/buying-something-interesting/>. המדריך נשאר כאן כמסמך עזר מלא, וכל מקום שבו כתוב Cloudflare אפשר להחליף ב-GitHub Pages — הוא כבר מוגדר ועובד. מצב מדויק נמצא ב-[ACTIVATE.md](ACTIVATE.md).
 
 **החשבון שכל השירותים ייפתחו עליו:** `g43095@gmail.com` (חשבון גוגל חדש — הבעלים).
 **המנהל של החנות (הכניסה ל-`admin.html`):** `mytovmail@gmail.com`.
@@ -75,7 +75,7 @@ ON CONFLICT (email) DO NOTHING;
 1. **Authentication** → **Sign In / Providers** → **Email**: ודא ש-*Enable Email provider* דלוק (ברירת מחדל).
 2. **Confirm email**: מומלץ לכבות (`OFF`) בהתחלה. המייל המובנה של Supabase בחינם מוגבל לכמה הודעות בשעה, ולקוחות חדשים היו נתקעים בלי יכולת לאשר את החשבון. כשתכבו — הרשמה בחנות עובדת מיד.
 3. **Authentication** → **URL Configuration**:
-   - **Site URL**: הכתובת הסופית של האתר, למשל `https://shelf-shop.pages.dev` (אפשר לעדכן אחרי שלב 4).
+   - **Site URL**: הכתובת הסופית של האתר, למשל `https://g43095-tech.github.io/buying-something-interesting/` (אפשר לעדכן אחרי שלב 4).
    - **Redirect URLs**: הוסף `https://shelf-shop.pages.dev/**` וגם `http://localhost:5177/**` לבדיקות מקומיות.
 
 ### 2.6 איסוף שלושת הערכים — כאן טועים הכי הרבה
@@ -100,7 +100,7 @@ ON CONFLICT (email) DO NOTHING;
 
 ### 3.2 יצירת המאגר
 1. <https://github.com/new>
-2. **Repository name**: `hamakom` (או `shop`)
+2. **Repository name**: `buying-something-interesting` — **שם המאגר קובע את כתובת האתר**, ואסור שיכיל `ali` / `aliexpress` / `alibaba` / `taobao` (AliExpress פוסל כתובת כזו בטופס השותפים).
 3. **Private** ✅ (חשוב — הקוד מכיל את כתובת הפרויקט)
 4. **אל** תסמן README / .gitignore — המאגר צריך להיות ריק.
 5. **Create repository**.
@@ -108,7 +108,7 @@ ON CONFLICT (email) DO NOTHING;
 ### 3.3 העלאת הקוד מהמחשב
 הקוד כבר קיים אצלך בתיקייה הזו. יש שתי דרכים:
 
-**אפשרות א' (מהירה) — אני דוחף:** שלח לי בצ'אט את שם המשתמש והמאגר (למשל `g43095-shop/hamakom`), ואני אחבר את Git בדרך של התחברות בדפדפן (`gh auth login --web`) ואדחוף. אין צורך לשלוח סיסמה.
+**אפשרות א' (מהירה) — אני דוחף:** שלח לי בצ'אט את שם המשתמש והמאגר (למשל `g43095-tech/buying-something-interesting`), ואני אחבר את Git בדרך של התחברות בדפדפן (`gh auth login --web`) ואדחוף. אין צורך לשלוח סיסמה.
 
 **אפשרות ב' (עצמאית) — GitHub Desktop:** התקן מ-<https://desktop.github.com>, התחבר, **File → Add local repository** ובחר את התיקייה הזו, ואז **Publish repository** (בטל את הסימון על *Keep this code private* אם המאגר כבר נוצר).
 
@@ -127,7 +127,7 @@ ON CONFLICT (email) DO NOTHING;
 
 ### 3.5 המשתנה (Variable)
 באותו מסך, לשונית **Variables** → **New repository variable**:
-- `SHOP_SITE_URL` = `https://shelf-shop.pages.dev` (הכתובת מ-Cloudflare, סעיף 4). אפשר להוסיף אחרי הפרסום הראשון ואז להריץ את ה-Workflow שוב.
+- `SHOP_SITE_URL` = `https://g43095-tech.github.io/buying-something-interesting/` (הכתובת מ-Cloudflare, סעיף 4). אפשר להוסיף אחרי הפרסום הראשון ואז להריץ את ה-Workflow שוב.
 
 ### 3.6 הפעלה ראשונה
 **Actions** → **Auto AliExpress Shop** → **Run workflow** → **Run workflow**.
@@ -143,12 +143,12 @@ ON CONFLICT (email) DO NOTHING;
 
 ### 4.2 חיבור המאגר
 1. **Workers & Pages** → **Create** → **Pages** → **Connect to Git**.
-2. אשר את הרשאת GitHub ובחר את המאגר שיצרת (`hamakom`).
+2. אשר את הרשאת GitHub ובחר את המאגר שיצרת (`buying-something-interesting`).
 3. **Begin setup** והגדר בדיוק:
 
 | שדה | ערך |
 |---|---|
-| **Project name** | `shelf-shop` ← **קובע את הכתובת**: `https://shelf-shop.pages.dev` |
+| **Project name** | לא רלוונטי — ב-GitHub Pages הכתובת נקבעת לפי שם המאגר: `https://g43095-tech.github.io/buying-something-interesting/` |
 | **Production branch** | `main` |
 | **Framework preset** | `None` |
 | **Root directory** | `aliexpress-store` |
@@ -158,13 +158,13 @@ ON CONFLICT (email) DO NOTHING;
 4. **Environment variables** (Production):
    - `SUPABASE_URL` = ה-Project URL מסעיף 2.6
    - `SUPABASE_SECRET_KEY` = ה-Secret key
-   - `SHOP_SITE_URL` = `https://shelf-shop.pages.dev`
+   - `SHOP_SITE_URL` = `https://g43095-tech.github.io/buying-something-interesting/`
 5. **Save and Deploy**. הבנייה הראשונה אורכת כ-1–2 דקות.
 
 > אם הבנייה נכשלת בהודעה על `SUPABASE_SECRET_KEY` — חזור ל-*Settings → Environment variables* וודא שהשם מדויק (אותיות גדולות, קו תחתון) ושאין רווחים בערך.
 
 ### 4.3 אחרי הפרסום
-1. פתח `https://shelf-shop.pages.dev` — אמורים להופיע מוצרים (בהתחלה ריק, עד שהאוטומציה תרוץ).
+1. פתח `https://g43095-tech.github.io/buying-something-interesting/` — אמורים להופיע מוצרים (בהתחלה ריק, עד שהאוטומציה תרוץ).
 2. `https://shelf-shop.pages.dev/admin.html` — התחבר עם `mytovmail@gmail.com` והסיסמה מסעיף 2.4.
 3. עדכן את `SHOP_SITE_URL` ב-GitHub (סעיף 3.5) והרץ את ה-Workflow שוב, כדי שה-sitemap והקישורים הקנוניים ייבנו נכון.
 
@@ -178,7 +178,7 @@ ON CONFLICT (email) DO NOTHING;
 
 ### 5.2 הצטרפות לתוכנית השותפים
 1. היכנס ל-<https://portals.aliexpress.com/> ולחץ **Join now / Register** — מתחברים עם אותו חשבון AliExpress.
-2. מלא: שם, מדינה (Israel), **איך תפרסם** → `Website`, כתובת האתר (`https://shelf-shop.pages.dev`), נושא האתר (Home & Kitchen / Gadgets).
+2. מלא: שם, מדינה (Israel), **איך תפרסם** → `Website`, כתובת האתר (`https://g43095-tech.github.io/buying-something-interesting/`), נושא האתר (Home & Kitchen / Gadgets).
 3. שלח. האישור לוקח בדרך כלל **1–3 ימי עסקים**. בינתיים אפשר להמשיך לשאר השלבים.
 4. אחרי האישור, ה-Tracking ID נמצא ב-**Account → Tracking ID** (למשל `shelfshop`). אם הוא לא `levtov`, עדכן את הסוד `ALIEXPRESS_TRACKING_ID` ב-GitHub.
 
@@ -211,7 +211,7 @@ ON CONFLICT (email) DO NOTHING;
 
 ## 8. רשות — Google Search Console (אחרי שהאתר באוויר)
 
-1. <https://search.google.com/search-console> → **Add property** → **URL prefix** → `https://shelf-shop.pages.dev`.
+1. <https://search.google.com/search-console> → **Add property** → **URL prefix** → `https://g43095-tech.github.io/buying-something-interesting/`.
 2. **Sitemaps** → שלח `https://shelf-shop.pages.dev/sitemap.xml`.
 
 ---
