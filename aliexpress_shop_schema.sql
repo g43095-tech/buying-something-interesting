@@ -254,7 +254,20 @@ CREATE POLICY "Admins can read approvals"
   TO authenticated
   USING (EXISTS (SELECT 1 FROM public.admins WHERE email = auth.jwt() ->> 'email'));
 
--- 9. הוספת המנהל הראשי (אותו מייל שכבר מוגדר כמנהל באתר הערוץ)
+-- 9. הוספת המנהל הראשי
 INSERT INTO public.admins (email)
-VALUES ('gb7676g@gmail.com')
+VALUES ('mytovmail@gmail.com')
 ON CONFLICT (email) DO NOTHING;
+
+-- 10. הרשאות טבלה (RLS לבדה אינה מספיקה: בלי GRANT כל בקשה נכשלת ב-403)
+GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
+GRANT SELECT ON public.shop_products TO anon, authenticated;
+GRANT ALL ON public.shop_products TO service_role;
+GRANT SELECT ON public.admins TO authenticated, service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.shop_favorites TO authenticated, service_role;
+GRANT SELECT, INSERT, UPDATE ON public.shop_preferences TO authenticated, service_role;
+GRANT SELECT, INSERT ON public.shop_clicks TO anon, authenticated, service_role;
+GRANT SELECT, INSERT ON public.shop_searches TO anon, authenticated, service_role;
+GRANT SELECT, INSERT ON public.shop_approvals TO authenticated, service_role;
+GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated, service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO anon, authenticated, service_role;
