@@ -11,7 +11,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Frank+Ruhl+Libre:wght@500;700&family=Heebo:wght@400;500;600;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="assets/store.css?v=20261125a" />
+  <link rel="stylesheet" href="assets/store.css?v=20261126a" />
 </head>
 <body>
   <a class="skip-link" href="#main">דילוג לתוכן</a>
@@ -65,6 +65,7 @@
         <a href="accessibility.html">נגישות</a>
         <a href="privacy.html">פרטיות</a>
       </div>
+      <button type="button" class="side-request" data-open-request>מחפשים מוצר? נחפש לכם</button>
       <a class="side-admin hidden" id="adminLink" href="admin.html">ניהול החנות</a>
     </div>
   </aside>
@@ -92,7 +93,28 @@
       </div>
     </div>
 
+    <section class="helper-grid" aria-label="שירותים">
+      <div class="helper-card">
+        <h2>מחפשים מוצר ולא מצאתם?</h2>
+        <p>כתבו לנו מה אתם מחפשים, ואנחנו נחפש בשבילכם באליאקספרס — הכי זול ובאיכות הכי טובה.</p>
+        <button type="button" class="btn btn-sm btn-primary" data-open-request>בקשת חיפוש אישית</button>
+      </div>
+      <div class="helper-card">
+        <h2>מוצרים חדשים ישר למייל</h2>
+        <p>פעם בשבוע, רק מה שנבחר. בלי ספאם.</p>
+        <form class="newsletter-form" id="newsletterForm" novalidate>
+          <input type="email" id="newsletterEmail" placeholder="האימייל שלכם" aria-label="אימייל לדיוור" autocomplete="email" required />
+          <button type="submit" class="btn btn-primary btn-sm">הרשמה</button>
+        </form>
+        <p class="form-note hidden" id="newsletterSaved">נרשמת לדיוור. תודה!</p>
+        <p class="form-msg" id="newsletterMsg"></p>
+      </div>
+    </section>
+
     <div class="grid" id="grid" aria-live="polite"></div>
+    <div class="load-more-wrap">
+      <button type="button" class="btn hidden" id="loadMore">עוד מוצרים</button>
+    </div>
     <div class="empty hidden" id="empty"></div>
 
     <p class="foot-note">כל הרכישות מתבצעות באתר אליאקספרס. ייתכן שנקבל עמלת שותפים על רכישה דרכך, ללא תוספת מחיר. · <a href="accessibility.html">נגישות</a> · <a href="privacy.html">פרטיות</a></p>
@@ -116,6 +138,41 @@
     </div>
   </div>
 
+  <!-- בקשת חיפוש מוצר אישית -->
+  <div class="overlay hidden" id="requestModal">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="requestTitle">
+      <div class="modal-head">
+        <h2 id="requestTitle">בקשת חיפוש אישית</h2>
+        <button type="button" class="modal-close" data-close="requestModal" aria-label="סגירה">×</button>
+      </div>
+      <div class="account-body">
+        <form id="requestForm">
+          <div class="field">
+            <label for="requestQuery">מה אתם מחפשים?</label>
+            <textarea id="requestQuery" required minlength="3" maxlength="300" placeholder="לדוגמה: מארגן מגירות למטבח"></textarea>
+          </div>
+          <div class="field-row">
+            <div class="field">
+              <label for="requestBudget">תקציב (₪, רשות)</label>
+              <input type="number" id="requestBudget" min="0" step="1" />
+            </div>
+            <div class="field">
+              <label for="requestEmail">אימייל לחזרה (רשות)</label>
+              <input type="email" id="requestEmail" autocomplete="email" />
+            </div>
+          </div>
+          <div class="field">
+            <label for="requestNote">עוד משהו שנדע? (רשות)</label>
+            <input type="text" id="requestNote" maxlength="600" />
+          </div>
+          <button type="submit" class="btn btn-primary btn-full" id="requestSubmit">שליחת הבקשה</button>
+          <p class="form-note" style="margin-top:10px">נחפש עבורכם ונחזור עם קישור למוצר שמצאנו — בדרך כלל תוך 1–2 ימים.</p>
+          <p class="form-msg" id="requestMsg"></p>
+        </form>
+      </div>
+    </div>
+  </div>
+
   <!-- תצוגה מוגדלת של תמונה -->
   <div class="overlay hidden" id="imageModal">
     <div class="img-viewer" role="dialog" aria-modal="true" aria-label="תצוגת תמונה">
@@ -135,7 +192,7 @@
   <div class="toast-host" id="toastHost" aria-live="polite"></div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js" defer></script>
-  <script src="config.js?v=20261125a" defer></script>
-  <script src="assets/store.js?v=20261125a" defer></script>
+  <script src="config.js?v=20261126a" defer></script>
+  <script src="assets/store.js?v=20261126a" defer></script>
 </body>
 </html>

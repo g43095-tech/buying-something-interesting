@@ -94,6 +94,16 @@
     { actor_email: 'demo@local', product_title: 'מברשת ניקוי חשמלית לריצוף', action: 'reject', created_at: '2026-11-23T18:40:00Z' }
   ];
 
+  var DEMO_REQUESTS = [
+    { id: 1, email: 'demo@local', product_query: 'מארגן מגירות למטבח עם תאים', budget: 60, note: 'מחפשת משהו שלא מתפרק', status: 'new', created_at: '2026-11-25T10:20:00Z' },
+    { id: 2, email: '', product_query: 'מחזיק טלפון לאופניים', budget: 0, note: '', status: 'done', created_at: '2026-11-24T18:05:00Z' }
+  ];
+
+  var DEMO_NEWSLETTER = [
+    { email: 'demo@local', consent: true, source: 'signup', created_at: '2026-11-25T09:00:00Z' },
+    { email: 'someone@example.com', consent: true, source: 'site', created_at: '2026-11-24T08:30:00Z' }
+  ];
+
   var state = {
     products: [],
     tab: 'pending',
@@ -103,7 +113,10 @@
     clicks: [],
     searches: [],
     approvals: [],
-    insightsLoaded: false
+    requests: [],
+    newsletter: [],
+    insightsLoaded: false,
+    communityLoaded: false
   };
 
   var TAB_LABELS = {
@@ -111,8 +124,12 @@
     approved: { title: 'מאושרים באתר', sub: 'מוצרים אלה מוצגים כרגע ללקוחות.' },
     removed: { title: 'הוסרו אוטומטית', sub: 'מוצרים שהקישור או המלאי שלהם נגמרו. אפשר להחזיר אותם לבדיקה.' },
     rejected: { title: 'נדחו', sub: 'מוצרים שלא אישרת. אפשר להחזיר אותם לבדיקה בכל רגע.' },
+    requests: { title: 'בקשות חיפוש', sub: 'מה הגולשים מבקשים שנמצא עבורם באליאקספרס.' },
+    newsletter: { title: 'מנויי דיוור', sub: 'כל מי שאישר קבלת מייל. אפשר להעתיק את הרשימה לדיוור.' },
     insights: { title: 'נתונים ולוג', sub: 'קליקים, חיפושים ללא תוצאה ולוג אישורים.' }
   };
+
+  var REQUEST_STATUS = { new: 'חדש', searching: 'בחיפוש', done: 'טופל', archived: 'ארכיון' };
 
   var ACTION_LABELS = {
     approve: 'אישר',
@@ -480,6 +497,163 @@
     renderStats();
   }
 
+  /* ---------- בקשות חיפוש ומנויי דיוור ---------- */
+
+  async function loadCommunity() {
+    if (state.communityLoaded) return;
+    if (state.demo) {
+      state.requests = DEMO_REQUESTS.map(function (row) { return Object.assign({}, row); });
+      state.newsletter = DEMO_NEWSLETTER.slice();
+      state.communityLoaded = true;
+      renderCommunity();
+      return;
+    }
+    if (!sb) return;
+
+    try {
+      var results = await Promise.all([
+        sb.from('shop_requests').select('*').order('created_at', { ascending: false }).limit(300),
+        sb.from('shop_newsletter').select('email,consent,source,created_at').order('created_at', { ascending: false }).limit(1000)
+      ]);
+      state.requests = results[0].error ? [] : results[0].data || [];
+      state.newsletter = results[1].error ? [] : results[1].data || [];
+      if (results[0].error || results[1].error) {
+        showDemoNote('לא הצלחנו לקרוא את טבלאות הדיוור והבקשות. הריצו שוב את aliexpress_shop_schema.sql.');
+      }
+    } catch (err) {
+      state.requests = [];
+      state.newsletter = [];
+    }
+    state.communityLoaded = true;
+    renderCommunity();
+  }
+
+  function requestRow(request) {
+    var status = request.status || 'new';
+    return '<div class="community-row">' +
+      '<div class="community-main">' +
+        '<h3>' + esc(request.product_query) + '</h3>' +
+        (request.note ? '<p>' + esc(request.note) + '</p>' : '') +
+        '<div class="community-meta">' +
+          (Number(request.budget) ? '<span>תקציב ' + money(request.budget) + '</span>' : '') +
+          (request.email ? '<span>' + esc(request.email) + '</span>' : '<span>בלי אימייל</span>') +
+          '<span>' + formatDate(request.created_at) + '</span>' +
+          '<span class="pill ' + esc(status) + '">' + esc(REQUEST_STATUS[status] || status) + '</span>' +
+        '</div>' +
+      '</div>' +
+      '<div class="community-actions">' +
+        (status !== 'done' ? '<button type="button" class="btn btn-sm btn-primary" data-request-action="done" data-id="' + esc(request.id) + '">סימון כטופל</button>' : '') +
+        '<button type="button" class="btn btn-sm btn-danger" data-request-action="delete" data-id="' + esc(request.id) + '">מחיקה</button>' +
+      '</div>' +
+    '</div>';
+  }
+
+  function newsletterRow(row) {
+    return '<div class="community-row">' +
+      '<div class="community-main">' +
+        '<h3>' + esc(row.email) + '</h3>' +
+        '<div class="community-meta">' +
+          '<span>' + (row.consent ? 'מאושר לדיוור' : 'הוסר מהדיוור') + '</span>' +
+          '<span>' + esc(row.source || 'site') + '</span>' +
+          '<span>' + formatDate(row.created_at) + '</span>' +
+        '</div>' +
+      '</div>' +
+      '<div class="community-actions">' +
+        '<button type="button" class="btn btn-sm btn-danger" data-subscriber-delete="' + esc(row.email) + '">הסרה</button>' +
+      '</div>' +
+    '</div>';
+  }
+
+  function renderCommunity() {
+    var panel = $('communityPanel');
+    if (!panel) return;
+
+    if (state.tab === 'requests') {
+      var open = state.requests.filter(function (row) { return row.status === 'new' || row.status === 'searching'; }).length;
+      panel.innerHTML =
+        '<div class="community-tools"><span class="form-note">' + state.requests.length + ' בקשות · ' + open + ' פתוחות</span></div>' +
+        (state.requests.length
+          ? '<div class="community-list">' + state.requests.map(requestRow).join('') + '</div>'
+          : '<p class="mini-empty">אין בקשות עדיין. בקשות מהאתר יופיעו כאן.</p>');
+      return;
+    }
+
+    var subscribed = state.newsletter.filter(function (row) { return row.consent; });
+    panel.innerHTML =
+      '<div class="community-tools"><span class="form-note">' + subscribed.length + ' רשומים לדיוור' +
+        (state.newsletter.length > subscribed.length ? ' · ' + (state.newsletter.length - subscribed.length) + ' הוסרו' : '') + '</span>' +
+        (subscribed.length ? '<button type="button" class="btn btn-sm" id="copyEmailsBtn">העתקת כל המיילים</button>' : '') + '</div>' +
+      (state.newsletter.length
+        ? '<div class="community-list">' + state.newsletter.map(newsletterRow).join('') + '</div>'
+        : '<p class="mini-empty">אין נרשמים עדיין.</p>');
+  }
+
+  function findRequest(id) {
+    return state.requests.filter(function (row) { return String(row.id) === String(id); })[0];
+  }
+
+  async function setRequestDone(id) {
+    var row = findRequest(id);
+    if (!row) return;
+    if (!state.demo) {
+      try {
+        var res = await sb.from('shop_requests').update({ status: 'done', updated_at: new Date().toISOString() }).eq('id', Number(id));
+        if (res.error) throw res.error;
+      } catch (err) {
+        toast('העדכון נכשל. נסו שוב.');
+        return;
+      }
+    }
+    row.status = 'done';
+    renderCommunity();
+    toast('הבקשה סומנה כטופלה');
+  }
+
+  async function deleteRequest(id) {
+    if (!window.confirm('למחוק את הבקשה?')) return;
+    if (!state.demo) {
+      try {
+        var res = await sb.from('shop_requests').delete().eq('id', Number(id));
+        if (res.error) throw res.error;
+      } catch (err) {
+        toast('המחיקה נכשלה. נסו שוב.');
+        return;
+      }
+    }
+    state.requests = state.requests.filter(function (row) { return String(row.id) !== String(id); });
+    renderCommunity();
+    toast('הבקשה נמחקה');
+  }
+
+  async function deleteSubscriber(email) {
+    if (!window.confirm('להסיר את ' + email + ' מהדיוור?')) return;
+    if (!state.demo) {
+      try {
+        var res = await sb.from('shop_newsletter').delete().eq('email', email);
+        if (res.error) throw res.error;
+      } catch (err) {
+        toast('ההסרה נכשלה. נסו שוב.');
+        return;
+      }
+    }
+    state.newsletter = state.newsletter.filter(function (row) { return row.email !== email; });
+    renderCommunity();
+    toast('הוסר מהדיוור');
+  }
+
+  function copySubscriberEmails() {
+    var emails = state.newsletter
+      .filter(function (row) { return row.consent; })
+      .map(function (row) { return row.email; })
+      .join(', ');
+    if (!emails) return;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(emails).then(function () { toast('המיילים הועתקו'); }, function () { toast(emails); });
+    } else {
+      toast(emails);
+    }
+  }
+
   function render() {
     var labels = TAB_LABELS[state.tab];
     $('tabTitle').textContent = labels.title;
@@ -491,17 +665,30 @@
 
     var list = filteredProducts();
     var isInsights = state.tab === 'insights';
-    $('reviewList').classList.toggle('hidden', isInsights);
-    $('empty').classList.toggle('hidden', isInsights || list.length > 0);
+    var isCommunity = state.tab === 'requests' || state.tab === 'newsletter';
+    $('reviewList').classList.toggle('hidden', isInsights || isCommunity);
+    $('empty').classList.toggle('hidden', isInsights || isCommunity || list.length > 0);
     $('insightsPanel').classList.toggle('hidden', !isInsights);
+    $('communityPanel').classList.toggle('hidden', !isCommunity);
     renderStats();
 
     if (isInsights) {
       $('approveAllBtn').classList.add('hidden');
+      $('addProductBtn').classList.add('hidden');
       if (!state.insightsLoaded) loadInsights();
       else renderInsights();
       return;
     }
+
+    if (isCommunity) {
+      $('approveAllBtn').classList.add('hidden');
+      $('addProductBtn').classList.add('hidden');
+      if (!state.communityLoaded) loadCommunity();
+      else renderCommunity();
+      return;
+    }
+
+    $('addProductBtn').classList.remove('hidden');
 
     var listHost = $('reviewList');
     var empty = $('empty');
@@ -892,6 +1079,22 @@
       else if (action === 'delete') removeProduct(id);
     });
 
+    $('communityPanel').addEventListener('click', function (event) {
+      var requestAction = event.target.closest('[data-request-action]');
+      if (requestAction) {
+        var id = requestAction.getAttribute('data-id');
+        if (requestAction.getAttribute('data-request-action') === 'done') setRequestDone(id);
+        else deleteRequest(id);
+        return;
+      }
+      var subscriber = event.target.closest('[data-subscriber-delete]');
+      if (subscriber) {
+        deleteSubscriber(subscriber.getAttribute('data-subscriber-delete'));
+        return;
+      }
+      if (event.target.closest('#copyEmailsBtn')) copySubscriberEmails();
+    });
+
     $('approveAllBtn').addEventListener('click', approveAllPending);
     $('adminSearch').addEventListener('input', function (event) {
       state.query = event.target.value.trim();
@@ -978,6 +1181,9 @@
     if (sb) { try { await sb.auth.signOut(); } catch (e) {} }
     state.products = [];
     state.insightsLoaded = false;
+    state.communityLoaded = false;
+    state.requests = [];
+    state.newsletter = [];
     showGate();
     $('loginEmail').value = '';
     $('loginPassword').value = '';

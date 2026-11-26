@@ -23,7 +23,9 @@ const SITE_URL = String(valueOf('--site-url', process.env.SHOP_SITE_URL || '')).
 const SUPABASE_URL = (process.env.SUPABASE_URL || 'https://louxyixmnftfqcfjkxsz.supabase.co').replace(/\/+$/, '');
 const SUPABASE_SECRET_KEY = (process.env.SUPABASE_SECRET_KEY || '').trim();
 const SITE_NAME = 'המדף';
-const ASSET_VERSION = '20261125a';
+const ASSET_VERSION = '20261126a';
+// קובץ הזנקה קטן: המוצרים הראשונים מוצגים מיד בכניסה, לפני קריאת כל הקטלוג מ-Supabase
+const SEED_COUNT = 24;
 
 const CATEGORY_SLUGS = {
   'בית ומטבח': 'home-kitchen',
@@ -170,6 +172,20 @@ async function loadProducts() {
   if (!res.ok) throw new Error(`Failed loading products (${res.status}): ${await res.text()}`);
   const rows = await res.json();
   return Array.isArray(rows) ? rows : [];
+}
+
+async function writeSeed(products) {
+  const fields = ['id', 'title', 'description', 'why', 'image_url', 'images', 'category', 'price',
+    'original_price', 'discount_percent', 'rating', 'orders', 'shipping_days', 'affiliate_url',
+    'sub_id', 'price_updated_at', 'created_at'];
+  const seed = products.slice(0, SEED_COUNT).map((product) => {
+    const row = { status: 'approved' };
+    for (const field of fields) row[field] = product[field] === undefined ? null : product[field];
+    return row;
+  });
+  const file = path.join(OUT_DIR, 'assets', 'latest-products.json');
+  await fs.mkdir(path.dirname(file), { recursive: true });
+  await fs.writeFile(file, JSON.stringify(seed), 'utf8');
 }
 
 function head({ title, description, canonical, ogImage, jsonLd, ogType = 'product' }) {
@@ -445,6 +461,8 @@ async function main() {
     byCategory.get(name).push(product);
   }
   const categories = Array.from(byCategory.keys()).sort((a, b) => a.localeCompare(b, 'he'));
+
+  await writeSeed(products);
 
   await fs.rm(path.join(OUT_DIR, 'p'), { recursive: true, force: true });
   await fs.rm(path.join(OUT_DIR, 'c'), { recursive: true, force: true });

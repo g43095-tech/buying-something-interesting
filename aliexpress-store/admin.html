@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Frank+Ruhl+Libre:wght@500;700&family=Heebo:wght@400;500;600;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="assets/store.css?v=20261125a" />
+  <link rel="stylesheet" href="assets/store.css?v=20261126a" />
 </head>
 <body class="admin-page">
   <!-- מסך כניסה -->
@@ -75,6 +75,14 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="m7 7 10 10M17 7 7 17"/></svg>
           נדחו
         </button>
+        <button type="button" class="nav-item" data-tab="requests">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.2-3.2"/></svg>
+          בקשות חיפוש
+        </button>
+        <button type="button" class="nav-item" data-tab="newsletter">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5.5" width="17" height="13" rx="2"/><path d="m4 7 8 6 8-6"/></svg>
+          מנויי דיוור
+        </button>
         <button type="button" class="nav-item" data-tab="insights">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M5 19V10M12 19V5M19 19v-6"/></svg>
           נתונים ולוג
@@ -106,6 +114,7 @@
       <div class="review-list" id="reviewList" aria-live="polite"></div>
       <div class="empty hidden" id="empty">אין מוצרים להצגה כאן.</div>
       <section class="insights hidden" id="insightsPanel" aria-label="נתוני החנות"></section>
+      <section class="hidden" id="communityPanel" aria-live="polite"></section>
     </main>
 
     <!-- עריכת מוצר -->
@@ -222,7 +231,7 @@
   <div class="toast-host" id="toastHost" aria-live="polite"></div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js" defer></script>
-  <script src="config.js?v=20261125a" defer></script>
-  <script src="assets/admin.js?v=20261125a" defer></script>
+  <script src="config.js?v=20261126a" defer></script>
+  <script src="assets/admin.js?v=20261126a" defer></script>
 </body>
 </html>

@@ -7,6 +7,8 @@
 
   var FAV_KEY = 'shelf_favorites_v1';
   var PREF_KEY = 'shelf_preferences_v1';
+  var NEWSLETTER_KEY = 'shelf_newsletter_v1';
+  var PAGE_SIZE = 18;
   var CATEGORIES = ['בית ומטבח', 'גאדג׳טים', 'ארגון ואחסון', 'רכב', 'טיפוח ופנאי', 'כלי עבודה'];
   var CATEGORY_SLUGS = {
     'בית ומטבח': 'home-kitchen',
@@ -75,7 +77,9 @@
     category: 'הכל',
     view: 'all',
     sort: 'newest',
-    maxPrice: 0
+    maxPrice: 0,
+    shown: PAGE_SIZE,
+    seeded: false
   };
 
   var loggedSearches = {};
@@ -550,14 +554,44 @@
       if (state.query) logEmptySearch(state.query);
     } else {
       empty.classList.add('hidden');
-      grid.innerHTML = list.map(cardHtml).join('');
+      grid.innerHTML = list.slice(0, state.shown).map(cardHtml).join('');
     }
+
+    updateLoadMore(list.length);
 
     document.querySelectorAll('.nav-item[data-view]').forEach(function (btn) {
       btn.classList.toggle('active', btn.getAttribute('data-view') === state.view);
     });
     renderCategories();
     renderPriceChips();
+  }
+
+  // מציגים קודם רק את הראשונים, ואת השאר טוענים בגלילה או בלחיצה
+  function updateLoadMore(total) {
+    var btn = $('loadMore');
+    if (!btn) return;
+    var left = total - state.shown;
+    if (left <= 0) {
+      btn.classList.add('hidden');
+      btn.textContent = 'עוד מוצרים';
+      return;
+    }
+    btn.classList.remove('hidden');
+    btn.textContent = 'עוד ' + left + ' מוצרים';
+  }
+
+  function showMore() {
+    var list = visibleProducts();
+    if (state.shown >= list.length) return;
+    var next = list.slice(state.shown, state.shown + PAGE_SIZE);
+    state.shown += next.length;
+    $('grid').insertAdjacentHTML('beforeend', next.map(cardHtml).join(''));
+    updateLoadMore(list.length);
+  }
+
+  function resetPaging() {
+    state.shown = PAGE_SIZE;
+    renderGrid();
   }
 
   function renderDemoNote() {
@@ -590,6 +624,7 @@
     state.sort = ['popular', 'price_asc', 'price_desc'].indexOf(saved.sort) === -1 ? DEFAULT_PREFS.sort : saved.sort;
     state.maxPrice = Math.max(0, Number(saved.max_price) || 0);
     $('sortSelect').value = state.sort;
+    state.shown = PAGE_SIZE;
     renderGrid();
   }
 
@@ -601,6 +636,24 @@
       return Array.isArray(rows) ? rows : [];
     } catch (e) {
       return [];
+    }
+  }
+
+  // קובץ הזנקה שנבנה מראש: המוצרים הראשונים מוצגים מיד, בלי להמתין לשאילתת Supabase
+  async function loadSeed() {
+    if (state.products.length) return false;
+    try {
+      var res = await fetch('assets/latest-products.json', { cache: 'no-cache' });
+      if (!res.ok) return false;
+      var rows = await res.json();
+      if (!Array.isArray(rows) || !rows.length) return false;
+      state.products = rows;
+      state.seeded = true;
+      state.shown = PAGE_SIZE;
+      renderGrid();
+      return true;
+    } catch (e) {
+      return false;
     }
   }
 
@@ -622,16 +675,22 @@
       );
 
       if (res.error) {
-        state.products = await loadDemoProducts();
-        state.demo = true;
+        // אם כבר הצגנו את קובץ ההזנקה — נשארים איתו ולא נופלים למצב הדגמה
+        if (!state.seeded) {
+          state.products = await loadDemoProducts();
+          state.demo = true;
+        }
         console.warn('[shop] products error:', res.error.message);
       } else {
         state.products = res.data || [];
         state.demo = false;
+        state.shown = PAGE_SIZE;
       }
     } catch (err) {
-      state.products = await loadDemoProducts();
-      state.demo = true;
+      if (!state.seeded) {
+        state.products = await loadDemoProducts();
+        state.demo = true;
+      }
     }
     renderDemoNote();
   }
@@ -647,6 +706,146 @@
       } catch (e) {}
     }
     state.favorites = new Set(readGuestFavorites());
+  }
+
+  /* ---------- ניוזלטר ---------- */
+
+  function validEmail(value) {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(String(value || '').trim());
+  }
+
+  function readNewsletterLocal() {
+    try {
+      var raw = JSON.parse(localStorage.getItem(NEWSLETTER_KEY) || 'null');
+      return raw && raw.email ? raw : null;
+    } catch (e) { return null; }
+  }
+
+  function saveNewsletterLocal(email) {
+    try { localStorage.setItem(NEWSLETTER_KEY, JSON.stringify({ email: email, at: new Date().toISOString() })); } catch (e) {}
+  }
+
+  // רישום לדיוור. אימייל שכבר רשום נחשב להצלחה מבחינת הגולש.
+  async function subscribeNewsletter(email, source) {
+    var clean = String(email || '').trim().toLowerCase();
+    if (!validEmail(clean)) return { ok: false, message: 'כתובת האימייל אינה תקינה.' };
+    if (!sb) { saveNewsletterLocal(clean); return { ok: true }; }
+    try {
+      var row = { email: clean, consent: true, source: source || 'site' };
+      if (state.user && state.user.id) row.user_id = state.user.id;
+      var res = await sb.from('shop_newsletter').insert(row);
+      if (res.error && String(res.error.code) !== '23505') throw res.error;
+      saveNewsletterLocal(clean);
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, message: 'לא הצלחנו לרשום אותך כרגע. נסו שוב בעוד רגע.' };
+    }
+  }
+
+  async function newsletterConsentFor(email) {
+    if (!sb || !state.user || !email) return null;
+    try {
+      var res = await sb.from('shop_newsletter').select('email,consent').ilike('email', email).maybeSingle();
+      if (res.error || !res.data) return null;
+      return Boolean(res.data.consent);
+    } catch (e) { return null; }
+  }
+
+  async function setNewsletterConsent(email, consent) {
+    if (!sb || !state.user) return { ok: true };
+    try {
+      var res = await sb.from('shop_newsletter').update({ consent: consent, updated_at: new Date().toISOString() }).ilike('email', email);
+      if (res.error) throw res.error;
+      if (!consent) { try { localStorage.removeItem(NEWSLETTER_KEY); } catch (e) {} }
+      return { ok: true };
+    } catch (e) {
+      return { ok: false };
+    }
+  }
+
+  function setNewsletterMessage(text, isError) {
+    var msg = $('newsletterMsg');
+    if (!msg) return;
+    msg.textContent = text || '';
+    msg.className = 'form-msg' + (text ? (isError ? ' error' : ' ok') : '');
+  }
+
+  function markNewsletterSubscribed() {
+    var form = $('newsletterForm');
+    if (form) form.classList.add('hidden');
+    var saved = $('newsletterSaved');
+    if (saved) saved.classList.remove('hidden');
+  }
+
+  async function submitNewsletterForm(event) {
+    event.preventDefault();
+    var input = $('newsletterEmail');
+    if (!input) return;
+    var btn = $('newsletterForm').querySelector('button');
+    setNewsletterMessage('');
+    if (btn) { btn.disabled = true; btn.textContent = 'רושם…'; }
+    var result = await subscribeNewsletter(input.value, 'site');
+    if (btn) { btn.disabled = false; btn.textContent = 'הרשמה'; }
+    if (!result.ok) { setNewsletterMessage(result.message, true); return; }
+    setNewsletterMessage('נרשמת! נעדכן אותך במוצרים החדשים.', false);
+    markNewsletterSubscribed();
+    toast('נרשמת לדיוור');
+  }
+
+  /* ---------- בקשת חיפוש מוצר אישית ---------- */
+
+  function setRequestMessage(text, isError) {
+    var msg = $('requestMsg');
+    if (!msg) return;
+    msg.textContent = text || '';
+    msg.className = 'form-msg' + (text ? (isError ? ' error' : ' ok') : '');
+  }
+
+  function openRequestModal() {
+    setRequestMessage('');
+    var email = $('requestEmail');
+    if (email && !email.value && state.user && state.user.email) email.value = state.user.email;
+    openModal('requestModal');
+  }
+
+  async function submitProductRequest(event) {
+    event.preventDefault();
+    var query = $('requestQuery').value.trim();
+    var email = $('requestEmail').value.trim().toLowerCase();
+    var budget = Number($('requestBudget').value) || 0;
+    var note = $('requestNote').value.trim();
+    var btn = $('requestSubmit');
+
+    if (query.length < 3) { setRequestMessage('כתבו מה אתם מחפשים (לפחות 3 תווים).', true); return; }
+    if (email && !validEmail(email)) { setRequestMessage('כתובת האימייל אינה תקינה.', true); return; }
+
+    setRequestMessage('');
+    btn.disabled = true;
+    btn.textContent = 'שולח…';
+
+    var ok = true;
+    if (sb) {
+      try {
+        var res = await sb.from('shop_requests').insert({
+          email: email,
+          product_query: query.slice(0, 300),
+          budget: budget > 0 ? budget : 0,
+          note: note.slice(0, 600)
+        });
+        if (res.error) throw res.error;
+      } catch (err) {
+        ok = false;
+      }
+    }
+
+    btn.disabled = false;
+    btn.textContent = 'שליחת הבקשה';
+
+    if (!ok) { setRequestMessage('השליחה נכשלה. נסו שוב בעוד רגע.', true); return; }
+
+    $('requestForm').reset();
+    setRequestMessage('קיבלנו! נחפש עבורכם ונחזור' + (email ? ' למייל ' + email : ' עם קישור למוצר') + '.', false);
+    toast('הבקשה נשלחה');
   }
 
   async function mergeGuestFavorites() {
@@ -880,6 +1079,10 @@
         '<div class="field"><label for="authPassword">סיסמה</label>' +
           '<input type="password" id="authPassword" minlength="6" autocomplete="current-password" required />' +
         '</div>' +
+        '<label class="check-field hidden" id="newsletterOptIn">' +
+          '<input type="checkbox" id="authNewsletter" />' +
+          '<span>אני מאשר/ת לקבל מייל עם מוצרים חדשים והטבות מהמדף. אפשר להסיר בכל רגע.</span>' +
+        '</label>' +
         '<button type="submit" class="btn btn-primary btn-full" id="authSubmit">התחברות</button>' +
         '<p class="form-note" style="margin-top:12px">המועדפים וההעדפות נשמרים בחשבון. בלי חשבון הם נשמרים במכשיר הזה.</p>' +
         '<p class="form-msg" id="authMsg"></p>' +
@@ -893,6 +1096,8 @@
         $('authSubmit').textContent = mode === 'signup' ? 'יצירת חשבון' : 'התחברות';
         $('authPassword').autocomplete = mode === 'signup' ? 'new-password' : 'current-password';
         $('authForm').dataset.mode = mode;
+        var optIn = $('newsletterOptIn');
+        if (optIn) optIn.classList.toggle('hidden', mode !== 'signup');
         setAuthMessage('');
       });
     });
@@ -932,15 +1137,20 @@
 
     try {
       if (mode === 'signup') {
+        var wantsNewsletter = Boolean($('authNewsletter') && $('authNewsletter').checked);
         var signUp = await sb.auth.signUp({ email: email, password: password });
         if (signUp.error) {
           setAuthMessage(mapAuthError(signUp.error.message), true);
-        } else if (signUp.data.session) {
-          await applySession(signUp.data.session);
-          closeModal('accountModal');
-          toast('החשבון נוצר');
         } else {
-          setAuthMessage('נשלח אליך מייל לאישור החשבון. אחרי האישור אפשר להתחבר.', false);
+          if (wantsNewsletter) await subscribeNewsletter(email, 'signup');
+          if (signUp.data.session) {
+            await applySession(signUp.data.session);
+            closeModal('accountModal');
+            toast(wantsNewsletter ? 'החשבון נוצר ונרשמת לדיוור' : 'החשבון נוצר');
+          } else {
+            setAuthMessage('נשלח אליך מייל לאישור החשבון. אחרי האישור אפשר להתחבר.' +
+              (wantsNewsletter ? ' המייל שלך נרשם גם לדיוור המוצרים.' : ''), false);
+          }
         }
       } else {
         var signIn = await sb.auth.signInWithPassword({ email: email, password: password });
@@ -986,11 +1196,55 @@
         '</div>' +
         '<button type="submit" class="btn btn-primary btn-full">שמירת העדפות</button>' +
       '</form>' +
+      '<div class="newsletter-box">' +
+        '<p class="prefs-title">דיוור במייל</p>' +
+        '<label class="check-field">' +
+          '<input type="checkbox" id="accountNewsletter" />' +
+          '<span>לקבל מייל על מוצרים חדשים והטבות</span>' +
+        '</label>' +
+        '<p class="form-note" id="accountNewsletterNote">אפשר להסיר בכל רגע, בלי לשאול שאלות.</p>' +
+      '</div>' +
       (state.isAdmin ? '<a class="btn btn-full" style="margin-top:10px" href="admin.html">ניהול החנות</a>' : '') +
       '<div class="account-actions"><button type="button" class="btn" id="logoutBtn">התנתקות</button></div>';
 
     $('prefsForm').addEventListener('submit', savePreferences);
     $('logoutBtn').addEventListener('click', logout);
+    initAccountNewsletter();
+  }
+
+  async function initAccountNewsletter() {
+    var toggle = $('accountNewsletter');
+    var note = $('accountNewsletterNote');
+    if (!toggle || !state.user) return;
+    var email = state.user.email || '';
+
+    var consent = await newsletterConsentFor(email);
+    if (consent === null) {
+      var local = readNewsletterLocal();
+      consent = Boolean(local && local.email && local.email === email.toLowerCase());
+    }
+    toggle.checked = consent;
+    if (note) note.textContent = consent ? 'רשום/ה לדיוור. אפשר להסיר בכל רגע.' : 'לא רשום/ה לדיוור כרגע.';
+
+    toggle.addEventListener('change', async function () {
+      toggle.disabled = true;
+      if (toggle.checked) {
+        var result = await subscribeNewsletter(email, 'account');
+        toggle.checked = result.ok;
+        if (note) note.textContent = result.ok ? 'נרשמת לדיוור.' : (result.message || 'לא הצלחנו לעדכן.');
+        if (result.ok) toast('נרשמת לדיוור');
+      } else {
+        var off = await setNewsletterConsent(email, false);
+        if (!off.ok) {
+          toggle.checked = true;
+          if (note) note.textContent = 'לא הצלחנו להסיר כרגע. נסו שוב.';
+        } else {
+          if (note) note.textContent = 'הוסרת מהדיוור.';
+          toast('הוסרת מהדיוור');
+        }
+      }
+      toggle.disabled = false;
+    });
   }
 
   async function savePreferences(event) {
@@ -1062,25 +1316,25 @@
 
     $('searchInput').addEventListener('input', function (event) {
       state.query = event.target.value.trim();
-      renderGrid();
+      resetPaging();
     });
 
     $('sortSelect').addEventListener('change', function (event) {
       state.sort = event.target.value;
-      renderGrid();
+      resetPaging();
     });
 
     $('priceChips').addEventListener('click', function (event) {
       var chip = event.target.closest('[data-price]');
       if (!chip) return;
       state.maxPrice = Number(chip.getAttribute('data-price')) || 0;
-      renderGrid();
+      resetPaging();
     });
 
     $('favBtn').addEventListener('click', function () {
       state.view = 'favorites';
       state.category = 'הכל';
-      renderGrid();
+      resetPaging();
       window.scrollTo({ top: 0, behavior: 'smooth' });
     });
 
@@ -1090,7 +1344,7 @@
       btn.addEventListener('click', function () {
         state.view = btn.getAttribute('data-view');
         document.body.classList.remove('sidebar-open');
-        renderGrid();
+        resetPaging();
       });
     });
 
@@ -1101,9 +1355,28 @@
       state.category = link.getAttribute('data-category');
       state.view = 'all';
       document.body.classList.remove('sidebar-open');
-      renderGrid();
+      resetPaging();
       window.scrollTo({ top: 0, behavior: 'smooth' });
     });
+
+    // טעינת עוד מוצרים בגלילה (עם כפתור כגיבוי)
+    var loadMore = $('loadMore');
+    if (loadMore) {
+      loadMore.addEventListener('click', showMore);
+      if ('IntersectionObserver' in window) {
+        var moreObserver = new IntersectionObserver(function (entries) {
+          if (entries[0].isIntersecting) showMore();
+        }, { rootMargin: '500px 0px' });
+        moreObserver.observe(loadMore);
+      }
+    }
+
+    // בקשות חיפוש אישיות ודיוור
+    document.querySelectorAll('[data-open-request]').forEach(function (button) {
+      button.addEventListener('click', openRequestModal);
+    });
+    if ($('requestForm')) $('requestForm').addEventListener('submit', submitProductRequest);
+    if ($('newsletterForm')) $('newsletterForm').addEventListener('submit', submitNewsletterForm);
 
     $('grid').addEventListener('click', function (event) {
       var fav = event.target.closest('[data-fav]');
@@ -1206,8 +1479,16 @@
   async function init() {
     bindEvents();
     $('resultMeta').setAttribute('aria-live', 'polite');
+    if (readNewsletterLocal()) markNewsletterSubscribed();
+
+    // קודם מציגים מיד את המוצרים הראשונים מהקובץ הבנוי, ואז טוענים את כל הקטלוג
+    await loadSeed();
     await loadProducts();
+    state.shown = PAGE_SIZE;
+    renderGrid();
+
     await loadFavorites();
+    renderGrid();
 
     if (sb) {
       try {
